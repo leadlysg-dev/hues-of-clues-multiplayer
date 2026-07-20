@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: hues-of-clues
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
