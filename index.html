@@ -140,14 +140,85 @@
   .lobby-player{display:flex; align-items:center; gap:10px; font-size:16px; font-weight:900;}
   .lobby-dot{width:18px; height:18px; border:3px solid var(--ink); flex-shrink:0;}
   .lobby-hint{font-size:12px; color:var(--muted); text-transform:none; letter-spacing:0; margin-bottom:16px;}
+
+  /* ============ HOW TO PLAY MODAL ============ */
+  #howToPlay{position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;
+             background:rgba(13,21,38,0.92); backdrop-filter:blur(2px);}
+  .htp-card{background:var(--panel); border:5px solid var(--accent); box-shadow:8px 8px 0 var(--ink), 0 0 40px rgba(255,236,39,0.2);
+            padding:32px; width:600px; max-width:100%; max-height:90vh; overflow-y:auto;}
+  .htp-card h2{font-size:26px; color:var(--accent); text-shadow:3px 3px 0 var(--ink), 0 0 16px rgba(255,236,39,0.4);
+               margin-bottom:6px; font-weight:900;}
+  .htp-card .htp-sub{font-size:12px; color:var(--muted); text-transform:none; letter-spacing:0; margin-bottom:24px;}
+  .htp-step{display:flex; gap:14px; margin-bottom:18px; align-items:flex-start;}
+  .htp-num{background:var(--pink); color:var(--ink); border:3px solid var(--ink); box-shadow:3px 3px 0 var(--ink);
+           font-size:16px; font-weight:900; width:36px; height:36px; flex-shrink:0;
+           display:flex; align-items:center; justify-content:center;}
+  .htp-text{font-size:14px; color:var(--text); text-transform:none; letter-spacing:0; line-height:1.7; padding-top:4px;}
+  .htp-text b{color:var(--accent);}
+  .htp-text .dim{color:var(--muted);}
+  .htp-divider{border:none; border-top:3px solid var(--panel2); margin:20px 0;}
+  .htp-score{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
+  .htp-score-item{background:var(--panel2); border:3px solid var(--ink); padding:8px 12px; font-size:13px; font-weight:900; text-align:center; flex:1; min-width:100px;}
+  .htp-score-item .htp-pts{font-size:24px; color:var(--green); display:block; margin-bottom:2px;}
+  .htp-score-item .htp-pts.pink{color:var(--pink);}
+  .htp-score-item span{color:var(--muted); font-size:11px; text-transform:none; letter-spacing:0; font-weight:900;}
+  .btn-htp{background:var(--green); color:var(--ink); font-size:20px; padding:18px; width:100%; margin-top:8px;}
+  .htp-again{font-size:11px; color:var(--muted); text-align:center; margin-top:10px; text-transform:none; letter-spacing:0; cursor:pointer; text-decoration:underline;}
 </style>
 </head>
 <body>
 
+<!-- ============ HOW TO PLAY ============ -->
+<div id="howToPlay" style="display:none">
+  <div class="htp-card">
+    <h2>How to Play 🎨</h2>
+    <div class="htp-sub">Each player is on their own device. You'll need a voice or video call to give clues out loud.</div>
+
+    <div class="htp-step">
+      <div class="htp-num">1</div>
+      <div class="htp-text">The host <b>creates a room</b> and shares the 4-letter code. Everyone else opens this page and joins with that code.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">2</div>
+      <div class="htp-text">Each round, one player is the <b>Cue Giver</b> 🎤. They get a private screen showing a secret color somewhere on the board — nobody else can see it.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">3</div>
+      <div class="htp-text">The Cue Giver says <b>one word or phrase out loud</b> to describe the color — something evocative, not the color name itself. <span class="dim">("sunset", "avocado", "2am"…)</span></div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">4</div>
+      <div class="htp-text">Everyone else takes turns clicking the tile they think matches the clue. You each get <b>one guess</b>. There's a timer — don't overthink it.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">5</div>
+      <div class="htp-text">The secret color is revealed. Points are awarded based on how close each guess was.</div>
+    </div>
+
+    <hr class="htp-divider">
+    <div style="font-size:13px;color:var(--pink);font-weight:900;margin-bottom:12px;letter-spacing:1px;">SCORING</div>
+    <div class="htp-score">
+      <div class="htp-score-item"><span class="htp-pts">3</span><span>★ Dead on</span></div>
+      <div class="htp-score-item"><span class="htp-pts">2</span><span>Solid box</span></div>
+      <div class="htp-score-item"><span class="htp-pts">1</span><span>Dashed box</span></div>
+      <div class="htp-score-item"><span class="htp-pts pink">+1</span><span>Cue giver, per guess in box</span></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;line-height:1.6;">
+      Everyone takes a turn as Cue Giver — <b style="color:var(--text)">twice each</b>. Most points after all rounds wins.
+    </div>
+
+    <button class="btn-htp" onclick="dismissHtp()">🎮 Got it — let's play!</button>
+    <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
+  </div>
+</div>
+
 <!-- ============ LANDING ============ -->
 <div id="landing">
   <div class="setup-card">
-    <h1>Hues of Clues 🎨</h1>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
+      <h1 style="margin-bottom:0">Hues of Clues 🎨</h1>
+      <button onclick="openHtp()" style="background:var(--panel2);color:var(--muted);border:3px solid var(--panel2);box-shadow:none;font-size:16px;padding:6px 12px;flex-shrink:0;margin-top:4px;" title="How to play">?</button>
+    </div>
     <div class="tag">Play live with friends anywhere — each player on their own device. One person gives a color clue, everyone else guesses where it is on the board.</div>
 
     <div class="field">
@@ -640,6 +711,17 @@ function tone(freq,dur,type,vol,attack){
 }
 function toggleMusic(){musicOn=!musicOn;if(musicOn)startMusic();renderGameHeader();}
 window.addEventListener('pointerdown',()=>{if(musicOn)ensureAudio();},{once:false});
+
+/* ====== HOW TO PLAY ====== */
+function openHtp(){el('howToPlay').style.display='flex';}
+function dismissHtp(){
+  el('howToPlay').style.display='none';
+  try{localStorage.setItem('htp-seen','1');}catch(e){}
+}
+// Show on first ever visit
+(function(){
+  try{if(!localStorage.getItem('htp-seen'))openHtp();}catch(e){}
+})();
 
 // Boot into landing
 el('landing').style.display='flex';
