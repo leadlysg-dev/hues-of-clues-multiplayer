@@ -48,12 +48,12 @@
   .icon-btn{background:var(--pink); color:var(--ink); font-size:20px; padding:12px 14px; line-height:1;}
 
   #clueBar{display:none; background:var(--accent); color:var(--ink); border:4px solid var(--ink);
-           box-shadow:5px 5px 0 var(--ink); padding:12px 20px; font-size:24px; font-weight:900;
+           box-shadow:5px 5px 0 var(--ink), 0 0 20px rgba(255,236,39,0.4); padding:12px 20px; font-size:24px; font-weight:900;
            text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   #scores{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
   .chip{background:var(--panel); border:4px solid var(--ink); padding:7px 12px; display:flex; align-items:center;
         gap:9px; font-size:16px; font-weight:900; box-shadow:3px 3px 0 var(--ink);}
-  .chip.turn{border-color:var(--accent); box-shadow:3px 3px 0 var(--accent);}
+  .chip.turn{border-color:var(--accent); box-shadow:3px 3px 0 var(--accent), 0 0 12px rgba(255,236,39,0.5);}
   .chip .dot{width:18px; height:18px; border:3px solid var(--ink);}
   .chip .pts{font-size:20px; font-weight:900; margin-left:4px; color:var(--accent);}
   .chip .delta{color:var(--green); font-weight:900; font-size:15px;}
@@ -73,7 +73,8 @@
           font-size:clamp(9px,1.3vw,20px); font-weight:900; color:var(--text); text-shadow:1px 1px 0 var(--ink);
           border:3px solid var(--ink); box-shadow:2px 2px 0 rgba(0,0,0,.6); z-index:6;}
   .cell.target::after{content:'★'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-          font-size:clamp(14px,2vw,30px); color:#fff; text-shadow:2px 2px 0 var(--ink),-2px -2px 0 var(--ink); z-index:9;}
+          font-size:clamp(14px,2vw,30px); color:#fff; text-shadow:2px 2px 0 var(--ink),-2px -2px 0 var(--ink), 0 0 10px #fff, 0 0 20px #fff; z-index:9; animation:starPulse 1s steps(2) infinite alternate;}
+  @keyframes starPulse{to{text-shadow:2px 2px 0 var(--ink),-2px -2px 0 var(--ink), 0 0 4px #fff;}}
   .cell.ring2{outline:5px solid var(--accent); outline-offset:-5px; z-index:5;}
   .cell.ring1{outline:4px dashed #fff; outline-offset:-4px; z-index:4;}
 
@@ -112,7 +113,7 @@
            background-image:linear-gradient(rgba(0,0,0,.25) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.25) 1px,transparent 1px);
            background-size:16px 16px;}
   .setup-card{background:var(--panel); border:5px solid var(--ink); box-shadow:8px 8px 0 var(--ink); padding:32px; width:540px; max-width:100%;}
-  .setup-card h1{font-size:30px; margin-bottom:6px; color:var(--accent); text-shadow:3px 3px 0 var(--ink); line-height:1.3;}
+  .setup-card h1{font-size:30px; margin-bottom:6px; color:var(--accent); text-shadow:3px 3px 0 var(--ink), 0 0 16px rgba(255,236,39,0.4); line-height:1.3;}
   .setup-card .tag{color:var(--muted); font-size:13px; margin-bottom:22px; text-transform:none; letter-spacing:0;}
   .field{margin-bottom:18px;}
   .field > label{display:block; font-size:14px; font-weight:900; color:var(--pink); margin-bottom:8px; letter-spacing:1px;}
@@ -134,7 +135,7 @@
          background-size:16px 16px;}
   .lobby-card{background:var(--panel); border:5px solid var(--ink); box-shadow:8px 8px 0 var(--ink); padding:32px; width:480px; max-width:100%;}
   .lobby-card h2{font-size:22px; color:var(--pink); margin-bottom:6px; font-weight:900;}
-  .code-display{font-size:64px; font-weight:900; color:var(--accent); text-shadow:4px 4px 0 var(--ink); letter-spacing:8px; text-align:center; margin:12px 0;}
+  .code-display{font-size:64px; font-weight:900; color:var(--accent); text-shadow:4px 4px 0 var(--ink), 0 0 24px rgba(255,236,39,0.6), 0 0 48px rgba(255,236,39,0.3); letter-spacing:8px; text-align:center; margin:12px 0;}
   .lobby-players{margin:16px 0; display:flex; flex-direction:column; gap:8px;}
   .lobby-player{display:flex; align-items:center; gap:10px; font-size:16px; font-weight:900;}
   .lobby-dot{width:18px; height:18px; border:3px solid var(--ink); flex-shrink:0;}
@@ -147,15 +148,15 @@
 <div id="landing">
   <div class="setup-card">
     <h1>Hues of Clues 🎨</h1>
-    <div class="tag">Real-time multiplayer color guessing. Create a room, share the code.</div>
+    <div class="tag">Play live with friends anywhere — each player on their own device. One person gives a color clue, everyone else guesses where it is on the board.</div>
 
     <div class="field">
       <label>Your Name</label>
-      <input id="landingName" class="txt-input" maxlength="16" placeholder="Enter name" autocomplete="off">
+      <input id="landingName" class="txt-input" maxlength="16" placeholder="How you'll appear to others" autocomplete="off">
     </div>
 
     <div class="field">
-      <label>Seconds per turn</label>
+      <label>Guess Timer (per player)</label>
       <div class="stepper">
         <button onclick="changeTimer(-5)">−</button>
         <div class="val"><span id="timerVal">30</span> <small id="timerUnit">seconds</small></div>
@@ -163,16 +164,16 @@
       </div>
     </div>
 
-    <button class="btn-green" onclick="doCreate()">▶ Create Room</button>
+    <button class="btn-green" onclick="doCreate()">▶ Host a New Game</button>
 
     <hr class="divider">
 
     <div class="field">
-      <label>Join Existing Room</label>
-      <input id="joinCode" class="txt-input" maxlength="4" placeholder="Room code (e.g. AXKM)" autocomplete="off" style="margin-bottom:8px">
+      <label>Join a Friend's Game</label>
+      <input id="joinCode" class="txt-input" maxlength="4" placeholder="4-letter room code" autocomplete="off" style="margin-bottom:8px">
       <input id="joinName" class="txt-input" maxlength="16" placeholder="Your name" autocomplete="off">
     </div>
-    <button class="btn-blue" onclick="doJoin()">→ Join Room</button>
+    <button class="btn-blue" onclick="doJoin()">→ Join Game</button>
     <div class="err-msg" id="landingErr"></div>
   </div>
 </div>
@@ -180,11 +181,11 @@
 <!-- ============ LOBBY ============ -->
 <div id="lobby">
   <div class="lobby-card">
-    <h2>Room Code</h2>
+    <h2>Share this code to invite players</h2>
     <div class="code-display" id="lobbyCode">????</div>
-    <div class="lobby-hint">Share this code with friends. Everyone joins at <b id="lobbyUrl"></b></div>
+    <div class="lobby-hint">Friends open <b id="lobbyUrl"></b> and enter this code. Each player joins on their own device.</div>
     <div class="lobby-players" id="lobbyPlayers"></div>
-    <button class="btn-green" id="lobbyStartBtn" onclick="doStart()" style="display:none">▶ Start Game</button>
+    <button class="btn-green" id="lobbyStartBtn" onclick="doStart()" style="display:none">▶ Everyone's In — Start Game</button>
     <div class="err-msg" id="lobbyErr"></div>
   </div>
 </div>
@@ -196,8 +197,8 @@
   <div id="peekSwatch"></div>
   <input id="clueInput" maxlength="40" placeholder="Type your clue here — it stays on screen while they guess">
   <div class="pbtns">
-    <button class="btn-ghost" id="peekHold">👀 Hold to see my color</button>
-    <button class="btn-accent" id="peekReady" onclick="doClueReady()">Everyone ready — start guessing →</button>
+    <button class="btn-ghost" id="peekHold">🎨 Hold to reveal my secret color</button>
+    <button class="btn-accent" id="peekReady" onclick="doClueReady()">I've said my clue — open the board →</button>
   </div>
 </div>
 
@@ -368,11 +369,12 @@ function renderLobby(){
   if(myIdx===state.hostIdx){
     startBtn.style.display='block';
     startBtn.disabled=state.players.length<2;
+    startBtn.title=state.players.length<2?'Need at least 2 players':'';
   } else {
     startBtn.style.display='none';
     const waiting=document.createElement('div');
     waiting.style.cssText='color:var(--muted);font-size:13px;text-transform:none;letter-spacing:0;margin-top:8px;';
-    waiting.textContent='Waiting for host to start the game…';
+    waiting.textContent=`Waiting for ${state.players[state.hostIdx].name} to start the game…`;
     pl.appendChild(waiting);
   }
 }
@@ -385,7 +387,7 @@ function doStart(){
 function renderPeek(){
   const p=state.players[state.cueGiver];
   el('peekTitle').textContent=`🎤 ${p.name} — you're the cue giver`;
-  el('peekMsg').innerHTML=`Everyone else, look away for a second. Hold the button to see your color, decide your clue, then say it out loud.<br><br>When your clue is said and everyone's ready, tap <b>start guessing</b>.`;
+  el('peekMsg').innerHTML=`This screen is yours alone — no one else can see it. Hold the button to reveal your secret color, then give your clue out loud on your call.<br><br>Everyone else is waiting on their own screen. When you've said your clue and they're ready, tap <b>start guessing</b> to open the board.`;
   const sw=el('peekSwatch');
   if(state.target){
     const {css}=cellHsl(state.target.r,state.target.c);
@@ -394,7 +396,11 @@ function renderPeek(){
   }
   const ci=el('clueInput'); ci.value='';
   const hold=el('peekHold');
-  const show=()=>{sw.style.visibility='visible';}, hide=()=>{sw.style.visibility='hidden';};
+  const show=()=>{
+    sw.style.visibility='visible';
+    if(state.target){const {css}=cellHsl(state.target.r,state.target.c); sw.style.boxShadow=`8px 8px 0 var(--ink), 0 0 32px ${css}, 0 0 64px ${css}`;}
+  };
+  const hide=()=>{sw.style.visibility='hidden'; sw.style.boxShadow='8px 8px 0 var(--ink)';};
   hold.onmousedown=show; hold.onmouseup=hide; hold.onmouseleave=hide;
   hold.ontouchstart=e=>{e.preventDefault();show();}; hold.ontouchend=hide;
 }
@@ -413,14 +419,16 @@ function renderGameHeader(){
 
   if(phase==='ready'){
     const cg=state.players[state.cueGiver];
-    phaseEl.innerHTML=`<span style="color:${cg.color}">${esc(cg.name)}</span> is giving the clue…`;
-    subEl.textContent='Look away — cue giver is seeing their color.';
+    phaseEl.innerHTML=`<span style="color:${cg.color}">${esc(cg.name)}</span> is crafting their clue…`;
+    subEl.textContent='They can see their secret color on their own screen. Sit tight — the board unlocks when they hit start.';
   } else if(phase==='guess'){
     const curIdx=state.turnQueue[0];
     const cur=state.players[curIdx];
     const isMyTurn=curIdx===myIdx;
-    phaseEl.innerHTML=`<span style="color:${cur.color}">${esc(cur.name)}</span>${isMyTurn?' — place your guess':' is guessing…'}`;
-    subEl.innerHTML=`Clue giver: <b>${esc(state.players[state.cueGiver].name)}</b>${isMyTurn?' · Click a tile or type its code (e.g. I13) + Enter':''}`;
+    phaseEl.innerHTML=`<span style="color:${cur.color}">${esc(cur.name)}</span>${isMyTurn?' — it\'s your turn to guess!':' is placing their guess…'}`;
+    subEl.innerHTML=isMyTurn
+      ? `Clue: <b>${esc(state.currentClue||'…')}</b> · Click a color tile, or type its grid code (e.g. <b>I13</b>) and press Enter`
+      : `Clue giver: <b>${esc(state.players[state.cueGiver].name)}</b> · Waiting for <b>${esc(cur.name)}</b> to guess`;
     if(myIdx===state.cueGiver||myIdx===state.hostIdx){
       addBtn(right,'↩ Undo','btn-ghost',doUndo,!state.guesses.length);
       addBtn(right,'⏭ Skip','btn-ghost',doSkip);
@@ -428,13 +436,13 @@ function renderGameHeader(){
   } else if(phase==='score'){
     phaseEl.textContent='🎯 Reveal!';
     const t=state.target;
-    subEl.innerHTML=t?`The color was <b>${coord(t.r,t.c)}</b>. ★=3 · solid box=2 · dashed box=1 · clue giver +1 per guess in box.`:'';
+    subEl.innerHTML=t?`The secret color was <b>${coord(t.r,t.c)}</b> — ★ dead-on = 3 pts · solid box = 2 pts · dashed box = 1 pt · clue giver gets +1 per guess inside the box`:'';
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next round →','btn-accent',doNextRound);
   } else if(phase==='over'){
     const best=Math.max(...state.players.map(p=>p.score));
     const winners=state.players.filter(p=>p.score===best).map(p=>p.name).join(' & ');
     phaseEl.textContent=`🏆 ${winners} win${winners.includes('&')?'':'s'}!`;
-    subEl.textContent='Great game.';
+    subEl.textContent='Thanks for playing — final scores above.';
     addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
   }
 
@@ -556,11 +564,11 @@ function renderPanel(){
       html+=`<div>
         <div class="pv-label" style="margin-bottom:6px">Type your guess</div>
         <div class="type-box"><div class="type-val ${typeBad?'bad':''}">${typeBuffer||'&nbsp;'}</div>
-        <div class="type-hint">Type a code like I13 from anywhere, then Enter</div></div>
+        <div class="type-hint">Type a grid code like I13 then press Enter — or just click the tile</div></div>
       </div>`;
     }
     if(isCueGiver){
-      html+=`<button class="hold-see ${showingSecret?'active':''}" id="holdSeeBtn">👁 Hold to see the secret color</button>`;
+      html+=`<button class="hold-see ${showingSecret?'active':''}" id="holdSeeBtn">🎨 Hold to peek at your secret color</button>`;
     }
   }
   p.innerHTML=html;
