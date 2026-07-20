@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1d2b53">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Hues of Clues 🎨</title>
 <style>
   /* ===== 8-BIT / PICO-8 THEME ===== */
@@ -67,8 +70,9 @@
   .corner{background:var(--panel);}
   .collabel,.rowlabel{background:var(--panel); color:var(--accent); font-weight:900;
          display:flex; align-items:center; justify-content:center; font-size:clamp(10px,1.05vw,17px);}
-  .cell{position:relative; border:1px solid rgba(0,0,0,.6); cursor:pointer;}
+  .cell{position:relative; border:1px solid rgba(0,0,0,.6); cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent;}
   .cell.guessable:hover{outline:4px solid var(--accent); outline-offset:-4px; z-index:8;}
+  button{touch-action:manipulation; -webkit-tap-highlight-color:transparent;}
   .marker{position:absolute; inset:15%; border-radius:0; display:flex; align-items:center; justify-content:center;
           font-size:clamp(9px,1.3vw,20px); font-weight:900; color:var(--text); text-shadow:1px 1px 0 var(--ink);
           border:3px solid var(--ink); box-shadow:2px 2px 0 rgba(0,0,0,.6); z-index:6;}
@@ -140,6 +144,66 @@
   .lobby-player{display:flex; align-items:center; gap:10px; font-size:16px; font-weight:900;}
   .lobby-dot{width:18px; height:18px; border:3px solid var(--ink); flex-shrink:0;}
   .lobby-hint{font-size:12px; color:var(--muted); text-transform:none; letter-spacing:0; margin-bottom:16px;}
+
+  /* ============ MOBILE GUESS BAR ============ */
+  #mobileBar{display:none; position:fixed; bottom:0; left:0; right:0; z-index:30;
+             background:var(--panel); border-top:4px solid var(--accent);
+             box-shadow:0 -4px 0 var(--ink), 0 0 24px rgba(255,236,39,0.3);
+             padding:10px 12px env(safe-area-inset-bottom,0); gap:8px; align-items:center;}
+  #mobileBar.active{display:flex;}
+  #mobileTypeInput{flex:1; background:var(--ink); border:3px solid var(--accent); color:var(--accent);
+                   padding:12px 10px; font-size:22px; font-weight:900; text-align:center;
+                   text-transform:uppercase; letter-spacing:4px; user-select:text;
+                   font-family:'Courier New',monospace;}
+  #mobileTypeInput::placeholder{color:var(--panel2); letter-spacing:1px; font-size:14px;}
+  #mobileSubmitBtn{background:var(--green); color:var(--ink); border:4px solid var(--ink);
+                   box-shadow:4px 4px 0 var(--ink); font-size:15px; font-weight:900;
+                   padding:12px 14px; white-space:nowrap;}
+
+  /* ============ MOBILE RESPONSIVE ============ */
+  @media(max-width:768px){
+    #app{padding:6px; gap:5px;}
+    header{padding:7px 10px; gap:8px; flex-wrap:wrap;}
+    .h-left{flex:1 1 calc(100% - 100px); min-width:0;}
+    .h-mid{order:3;}
+    .h-right{order:2; gap:5px;}
+    .h-phase{font-size:16px;}
+    .h-sub{font-size:11px; margin-top:1px;}
+    .h-round{font-size:12px;}
+    .timer{font-size:30px; min-width:72px;}
+    .h-right button{padding:8px 10px; font-size:12px;}
+    .icon-btn{font-size:15px; padding:8px 10px;}
+    #clueBar{font-size:15px; padding:7px 10px;}
+    #scores{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:3px; gap:6px;}
+    .chip{flex-shrink:0; padding:5px 8px; font-size:13px; gap:6px;}
+    .chip .dot{width:13px; height:13px;}
+    .chip .pts{font-size:15px;}
+    .main{gap:0;}
+    .panel{display:none;}
+    .board-area{align-items:stretch; justify-content:stretch;}
+    #board{min-width:0;}
+    #app.bar-open{padding-bottom:68px;}
+    #peek{gap:12px; padding:20px 16px; overflow-y:auto; justify-content:flex-start; padding-top:36px;}
+    #peek h2{font-size:22px;}
+    #peek p{font-size:14px;}
+    #peekSwatch{width:min(82vw,520px); height:min(24vh,200px);}
+    #clueInput{font-size:16px; padding:12px 14px; width:90vw;}
+    #peek .pbtns button{font-size:15px; padding:13px 16px;}
+    .setup-card{padding:20px 18px;}
+    .lobby-card{padding:20px 18px;}
+    .code-display{font-size:48px; letter-spacing:4px;}
+    .btn-green,.btn-blue{font-size:17px; padding:14px;}
+    .htp-card{padding:20px;}
+    .htp-card h2{font-size:20px;}
+    .htp-score-item{min-width:70px; padding:6px 8px;}
+  }
+  @media(max-width:420px){
+    .h-phase{font-size:14px;}
+    .h-sub{display:none;}
+    .timer{font-size:24px; min-width:58px;}
+    .code-display{font-size:36px; letter-spacing:2px;}
+    .h-right button{padding:7px 8px; font-size:11px;}
+  }
 
   /* ============ HOW TO PLAY MODAL ============ */
   #howToPlay{position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;
@@ -273,6 +337,12 @@
   </div>
 </div>
 
+<!-- ============ MOBILE GUESS BAR ============ -->
+<div id="mobileBar">
+  <input id="mobileTypeInput" type="text" maxlength="3" placeholder="Tile code e.g. I13" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+  <button id="mobileSubmitBtn" onclick="mobileSubmit()">Guess →</button>
+</div>
+
 <!-- ============ MAIN APP ============ -->
 <div id="app">
   <header>
@@ -395,6 +465,7 @@ function render(){
   el('lobby').style.display='none';
   el('peek').style.display='none';
   el('app').style.display='none';
+  updateMobileBar();
 
   if(phase==='lobby'){
     renderLobby();
@@ -711,6 +782,38 @@ function tone(freq,dur,type,vol,attack){
 }
 function toggleMusic(){musicOn=!musicOn;if(musicOn)startMusic();renderGameHeader();}
 window.addEventListener('pointerdown',()=>{if(musicOn)ensureAudio();},{once:false});
+
+/* ====== MOBILE GUESS BAR ====== */
+const isMobile=()=>window.matchMedia('(max-width:768px)').matches;
+function updateMobileBar(){
+  const bar=el('mobileBar');
+  const isMyGuess=state&&state.phase==='guess'&&state.turnQueue[0]===myIdx;
+  if(isMobile()&&isMyGuess){
+    bar.classList.add('active');
+    el('app').classList.add('bar-open');
+  } else {
+    bar.classList.remove('active');
+    el('app').classList.remove('bar-open');
+    if(el('mobileTypeInput')) el('mobileTypeInput').value='';
+  }
+}
+function mobileSubmit(){
+  const val=(el('mobileTypeInput').value||'').trim().toUpperCase();
+  const rc=parseCoord(val);
+  if(!rc){
+    el('mobileTypeInput').style.borderColor='var(--pink)';
+    setTimeout(()=>{el('mobileTypeInput').style.borderColor='var(--accent)';},400);
+    return;
+  }
+  wsSend({type:'PLACE_GUESS',r:rc.r,c:rc.c});
+  el('mobileTypeInput').value='';
+}
+el('mobileTypeInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'||e.key==='Go'){e.preventDefault();mobileSubmit();}
+});
+el('mobileTypeInput').addEventListener('input',e=>{
+  e.target.value=e.target.value.toUpperCase().replace(/[^A-P0-9]/g,'').slice(0,3);
+});
 
 /* ====== HOW TO PLAY ====== */
 function openHtp(){el('howToPlay').style.display='flex';}
