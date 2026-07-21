@@ -12,10 +12,36 @@
 // Run: node test-disconnect.js   (spawns the real server on PORT, real ws clients)
 
 const { spawn } = require('child_process');
+const net = require('net');
 const WebSocket = require('ws');
 
-const PORT = process.env.TEST_PORT || 3999;
-const URL = `ws://127.0.0.1:${PORT}`;
+// Port is resolved at startup, not hardcoded: an occupied port must make the
+// harness say "can't run", never look like a red test.
+//   TEST_PORT=N  — use exactly N, and abort loudly if it is taken.
+//   (unset)      — bind an ephemeral free port chosen by the OS.
+let PORT = null;
+let URL = null;
+
+// Ask the OS for a port nobody is listening on.
+function freePort() {
+  return new Promise((res, rej) => {
+    const s = net.createServer();
+    s.on('error', rej);
+    s.listen(0, '127.0.0.1', () => {
+      const { port } = s.address();
+      s.close(() => res(port));
+    });
+  });
+}
+
+// True if we can bind it ourselves right now.
+function portIsFree(port) {
+  return new Promise(res => {
+    const s = net.createServer();
+    s.on('error', () => res(false));
+    s.listen(port, '127.0.0.1', () => s.close(() => res(true)));
+  });
+}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -215,12 +241,46 @@ async function testD2() {
 }
 
 (async () => {
+  if (process.env.TEST_PORT) {
+    PORT = Number(process.env.TEST_PORT);
+    if (!(await portIsFree(PORT))) {
+      console.error(
+        `CANNOT RUN: TEST_PORT=${PORT} is already in use by another process.\n` +
+        `            Free it (lsof -iTCP:${PORT} -sTCP:LISTEN -n -P) or unset TEST_PORT\n` +
+        `            to let the harness pick a free port automatically.\n` +
+        `            No tests were run — this is not a test failure.`
+      );
+      process.exit(2);
+    }
+  } else {
+    PORT = await freePort();
+  }
+  URL = `ws://127.0.0.1:${PORT}`;
+
   const srv = spawn(process.execPath, ['server.js'], {
     cwd: __dirname,
-    env: { ...process.env, PORT },
+    env: { ...process.env, PORT: String(PORT) },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
-  await new Promise(res => srv.stdout.on('data', d => String(d).includes('listening') && res()));
+
+  // If the server dies or never announces itself, say so instead of hanging.
+  let started = false;
+  srv.on('exit', code => {
+    if (!started) {
+      console.error(`CANNOT RUN: server.js exited (code ${code}) before it began listening on ${PORT}.\n` +
+                    `            No tests were run — this is not a test failure.`);
+      process.exit(2);
+    }
+  });
+  await new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error(
+      `CANNOT RUN: server.js did not report "listening" on port ${PORT} within 10s.\n` +
+      `            No tests were run — this is not a test failure.`
+    )), 10000);
+    srv.stdout.on('data', d => {
+      if (String(d).includes('listening')) { started = true; clearTimeout(t); res(); }
+    });
+  }).catch(e => { console.error(e.message); srv.kill(); process.exit(2); });
 
   try {
     await testD1();
