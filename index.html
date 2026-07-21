@@ -931,7 +931,18 @@
 
 <script>
 const COLS=30, ROWS=16;
-const KNOWN_PHASES=new Set(['lobby','ready','guess','score','over','question','buzzed','judging','drawing','guessed','voting','reveal']);
+// Phases each mode actually emits, taken from the game modules rather than from
+// the brief — the old client's set was missing bluff's 'writing' and pictionary's
+// 'timeout'/'vote', which put a spinner over three phases of working gameplay.
+const PHASES_BY_GAME={
+  hues:['ready','guess'],
+  spectrum:['ready','guess'],
+  trivia:['question','buzzed','judging'],
+  bluff:['reveal','writing','voting'],
+  pictionary:['drawing','guessed','timeout','vote'],
+};
+const SHARED_PHASES=['lobby','score','over'];
+const KNOWN_PHASES=new Set([...SHARED_PHASES,...Object.values(PHASES_BY_GAME).flat()]);
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const coord=(r,c)=>String.fromCharCode(65+r)+(c+1);
 
@@ -1074,7 +1085,12 @@ function render(){
     el('clueBar').style.display='none';
     el('panel').style.display='none';
     el('waiting').style.display='flex';
-    el('waitingPhase').textContent=phase;
+    // A phase that is legal for another mode means client and server disagree about
+    // the build, not that the game broke. Worth telling apart on a live deploy.
+    const ownedBy=Object.keys(PHASES_BY_GAME).find(g=>PHASES_BY_GAME[g].includes(phase));
+    el('waitingPhase').textContent=ownedBy&&ownedBy!==state.gameType
+      ? `"${phase}" belongs to ${ownedBy} — this page may be out of date. Reload.`
+      : phase;
     renderScores();
     return;
   }
