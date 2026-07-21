@@ -2,6 +2,7 @@
 
 // Registry of game modules. Add new games here when built.
 const MODULES = {
+  hues: require('./game'),
   spectrum: require('./game-spectrum'),
   trivia: require('./game-trivia'),
   bluff: require('./game-bluff'),

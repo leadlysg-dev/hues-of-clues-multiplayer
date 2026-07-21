@@ -587,7 +587,8 @@
     <div class="field">
       <label>Game Mode</label>
       <div class="game-mode-toggle">
-        <button class="gm-btn active" id="gmSpectrum" onclick="setGameMode('spectrum')">🎨 Spectrum</button>
+        <button class="gm-btn" id="gmHues" onclick="setGameMode('hues')">🎨 Hues</button>
+        <button class="gm-btn active" id="gmSpectrum" onclick="setGameMode('spectrum')">🌈 Spectrum</button>
         <button class="gm-btn" id="gmTrivia" onclick="setGameMode('trivia')">🧠 Trivia</button>
         <button class="gm-btn" id="gmBluff" onclick="setGameMode('bluff')">🃏 Bluff</button>
         <button class="gm-btn" id="gmPictionary" onclick="setGameMode('pictionary')">✏️ Pixel</button>
@@ -716,6 +717,7 @@ function changeTimer(d){
 
 function setGameMode(type){
   selectedGameType=type;
+  el('gmHues').classList.toggle('active',type==='hues');
   el('gmSpectrum').classList.toggle('active',type==='spectrum');
   el('gmTrivia').classList.toggle('active',type==='trivia');
   el('gmBluff').classList.toggle('active',type==='bluff');

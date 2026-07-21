@@ -129,6 +129,7 @@ function sanitizeForPlayer(room, playerIdx) {
   const hideTarget = (room.phase === 'ready' || room.phase === 'guess') && playerIdx !== room.cueGiver;
   return {
     code: room.code,
+    gameType: room.gameType,
     hostIdx: room.hostIdx,
     players: room.players.map(p => ({ name: p.name, color: p.color, score: p.score, connected: p.connected })),
     round: room.round,
@@ -145,11 +146,48 @@ function sanitizeForPlayer(room, playerIdx) {
   };
 }
 
+// Adapter interface used by game-router: populate game-specific fields on the base room.
+function initRoom(room) {
+  room.cueGiver = 0;
+  room.target = null;
+  room.guesses = [];
+  room.turnQueue = [];
+  room.lastDeltas = room.players.map(() => 0);
+  room.currentClue = '';
+  room.timerId = null;
+}
+
+// Adapter interface used by game-router: dispatch all in-game messages.
+function processGuess(room, playerIdx, msg) {
+  switch (msg.type) {
+    case 'CLUE_READY':
+      beginGuessing(room, msg.clue);
+      return { ok: true };
+    case 'PLACE_GUESS':
+      return placeGuess(room, playerIdx, msg.r, msg.c);
+    case 'SKIP_TURN':
+    case 'TIMER_EXPIRE':
+      skipTurn(room);
+      return { ok: true };
+    case 'UNDO_LAST':
+      undoLast(room);
+      return { ok: true };
+    case 'NEXT_ROUND':
+      nextRound(room);
+      return { ok: true };
+    case 'PLAY_AGAIN':
+      playAgain(room);
+      return { ok: true };
+    default:
+      return { ok: false, error: `Unknown message: ${msg.type}`, silent: true };
+  }
+}
+
 module.exports = {
   COLS, ROWS, PLAYER_COLORS,
   cellHsl, coord, parseCoord,
-  createRoom, startRound, beginGuessing,
+  initRoom, createRoom, startRound, beginGuessing,
   placeGuess, skipTurn, undoLast,
   revealScore, nextRound, playAgain,
-  sanitizeForPlayer,
+  processGuess, sanitizeForPlayer,
 };
