@@ -27,19 +27,23 @@ function freePort() {
   return new Promise((res, rej) => {
     const s = net.createServer();
     s.on('error', rej);
-    s.listen(0, '127.0.0.1', () => {
+    // Unspecified address, not 127.0.0.1: a port free on loopback can still be
+    // taken by a listener bound on :: or 0.0.0.0.
+    s.listen(0, () => {
       const { port } = s.address();
       s.close(() => res(port));
     });
   });
 }
 
-// True if we can bind it ourselves right now.
+// True if we can bind it ourselves right now. Binds the unspecified address so
+// a listener on :: or 0.0.0.0 counts as taken — probing 127.0.0.1 alone lets
+// those through and the pre-check then hands a doomed port to the server.
 function portIsFree(port) {
   return new Promise(res => {
     const s = net.createServer();
     s.on('error', () => res(false));
-    s.listen(port, '127.0.0.1', () => s.close(() => res(true)));
+    s.listen(port, () => s.close(() => res(true)));
   });
 }
 
