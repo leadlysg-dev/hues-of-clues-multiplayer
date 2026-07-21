@@ -84,10 +84,25 @@ function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
 
+// The phase-deadline block is injected here rather than inside each module's
+// sanitizeForPlayer, so the client surface costs zero module changes and cannot
+// drift between games. Null whenever the current phase has no deadline.
+function deadlineState(room) {
+  if (room._deadlinePhase !== room.phase) return null;
+  const total = PHASE_DEADLINES[room.gameType]?.[room.phase];
+  if (!total) return null;
+  return {
+    phase: room.phase,
+    remaining: timer.getRemaining(room, 'phase'),
+    total: Math.round(total / DEADLINE_SCALE),
+  };
+}
+
 function broadcastState(room) {
+  const deadline = deadlineState(room);
   room.players.forEach((p, idx) => {
     if (p.ws && p.ws.readyState === p.ws.OPEN) {
-      send(p.ws, { type: 'STATE', state: game.sanitizeForPlayer(room, idx) });
+      send(p.ws, { type: 'STATE', state: { ...game.sanitizeForPlayer(room, idx), deadline } });
     }
   });
 }
@@ -119,6 +134,53 @@ function stopRoomTimer(room) {
   room.timerSeconds = 0;
 }
 
+// Phase deadlines. Ping/pong terminates a socket nobody answers on, but not a human
+// who walked away with a live tab — the browser keeps answering pongs for them. These
+// are the durations NIKO ruled (game feel is their call, not platform's):
+//   bluff/writing 90s   — a writing task; rushing it costs more than one idle player
+//   bluff/voting  45s   — reading four short submissions
+//   pictionary/vote 30s — a one-tap difficulty rating
+// Deliberately absent: pictionary/drawing already has its own 90s round timer and a
+// second deadline would double-fire; trivia/judging has none, because timing out a
+// host's scoring decision auto-resolves it, which is worse than waiting.
+const PHASE_DEADLINES = {
+  bluff: { writing: 90, voting: 45 },
+  pictionary: { vote: 30 },
+};
+// Test-only: divides every deadline so a suite can exercise real expiry in ~1s.
+const DEADLINE_SCALE = parseInt(process.env.DEADLINE_SCALE) || 1;
+
+// Expiry advances the phase on whoever did act — it is not a forfeit. A player who
+// timed out simply has no submission and no vote; nobody is punished for a slow phone.
+function applyPhaseDeadline(room) {
+  const seconds = PHASE_DEADLINES[room.gameType]?.[room.phase];
+  const connected = room.players.filter(p => p.connected).length;
+
+  if (!seconds || connected === 0) {
+    timer.stopTimer(room, 'phase');
+    room._deadlinePhase = null;
+    return;
+  }
+  if (room._deadlinePhase === room.phase) return; // already running for this phase
+
+  room._deadlinePhase = room.phase;
+  const startedIn = room.phase;
+  timer.startTimer(room, 'phase', Math.max(1, Math.round(seconds / DEADLINE_SCALE)),
+    rem => {
+      // Every second near the end so the countdown is honest; sparser before that,
+      // because a full state broadcast per second for 90s is real traffic on free tier.
+      if (rem <= 15 || rem % 15 === 0) broadcastState(room);
+    },
+    () => {
+      if (room.phase !== startedIn) return; // phase moved on; deadline is stale
+      room._deadlinePhase = null;
+      game.processGuess(room, null, { type: 'PHASE_DEADLINE' });
+      applyTimerPolicy(room);
+      broadcastState(room);
+    }
+  );
+}
+
 // After any game action, apply the correct timer policy for the current game/phase.
 function applyTimerPolicy(room) {
   if (room.phase === 'guess' && room.turnQueue.length > 0) {
@@ -145,6 +207,8 @@ function applyTimerPolicy(room) {
     timer.stopTimer(room, 'round');
     timer.stopTimer(room, 'buzz');
   }
+  // Independent of the turn/round timers above: a phase can have both, or only this.
+  applyPhaseDeadline(room);
 }
 
 wss.on('connection', (ws) => {
@@ -332,6 +396,7 @@ wss.on('connection', (ws) => {
     } else {
       timer.stopAllTimers(room);
       room.timerSeconds = 0;
+      room._deadlinePhase = null; // so a reconnect restarts the deadline cleanly
     }
   });
 });

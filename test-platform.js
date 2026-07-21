@@ -11,6 +11,11 @@
 //   P2 — client version skew. index.html was read into memory once at boot, so a
 //        long-lived process serves a stale client after the file changes underneath it.
 //        Presents as a game bug; is a deploy bug.
+//   P3 — phase deadlines must be visible. Ping/pong cannot cut a human who walked away
+//        with a live tab, so a deadline is the only escape; and a phase that advances
+//        with no visible countdown is a bug from where the player sits.
+//   P4 — an expired deadline must advance the phase on whoever did act. RED until the
+//        PHASE_DEADLINE case lands in the game modules; that half is NIKO's.
 //
 // Run: node test-platform.js
 
@@ -22,6 +27,9 @@ const http = require('http');
 const WebSocket = require('ws');
 
 const HEARTBEAT_MS = 300; // real ping/pong, just faster than the 30s production default
+// Real deadline expiry, scaled down: bluff/writing is 90s in production, 3s here.
+const DEADLINE_SCALE = 30;
+const DEADLINE_SECONDS = 90 / DEADLINE_SCALE;
 let PORT = null;
 
 function freePort() {
@@ -144,11 +152,83 @@ async function testP2() {
     `after touch ${afterTouch.status} etag=${afterTouch.etag}`);
 }
 
+// P3: the deadline has to reach the player. A phase that silently advances is a bug
+// from where the player sits, however correct the server is — so the countdown is part
+// of the server contract, not a client nicety. Server-side half: the state block.
+async function testP3() {
+  const host = client('Host');
+  await host.ready;
+  host.send({ type: 'CREATE_ROOM', name: 'Host', gameType: 'bluff' });
+  await sleep(80);
+  const p1 = client('P1');
+  await p1.ready;
+  p1.send({ type: 'JOIN_ROOM', code: host.code, name: 'P1' });
+  await sleep(60);
+
+  host.send({ type: 'START_GAME' });
+  await sleep(100);
+  const inReveal = host.state.deadline; // 'reveal' has no deadline — must be null
+
+  host.send({ type: 'START_WRITING' });
+  await sleep(100);
+  const opened = host.state.deadline;
+
+  await sleep(1100);
+  const later = host.state.deadline;
+
+  const nullWhenNone = inReveal === null;
+  const present = !!opened && opened.phase === 'writing' && opened.total === DEADLINE_SECONDS;
+  const countsDown = !!later && later.remaining < opened.remaining;
+
+  check('P3', 'the phase deadline is visible in state and counts down',
+    nullWhenNone && present && countsDown,
+    `reveal=${JSON.stringify(inReveal)}; writing=${JSON.stringify(opened)}; ` +
+    `+1.1s=${JSON.stringify(later)}`);
+
+  [host, p1].forEach(c => { try { c.ws.close(); } catch {} });
+}
+
+// P4: expiry must actually advance the phase on whoever did act. RED until NIKO lands
+// the PHASE_DEADLINE case in the modules — same deliberate red as D1 was.
+async function testP4() {
+  const host = client('Host');
+  await host.ready;
+  host.send({ type: 'CREATE_ROOM', name: 'Host', gameType: 'bluff' });
+  await sleep(80);
+  const p1 = client('P1');
+  await p1.ready;
+  p1.send({ type: 'JOIN_ROOM', code: host.code, name: 'P1' });
+  await sleep(60);
+
+  host.send({ type: 'START_GAME' });
+  await sleep(100);
+  host.send({ type: 'START_WRITING' });
+  await sleep(100);
+
+  if (host.state.phase !== 'writing') {
+    return check('P4', 'an expired deadline advances the phase on whoever did act',
+      false, `setup failed: expected phase 'writing', got '${host.state.phase}'`);
+  }
+
+  // Host writes; P1 is the player who wandered off with a live tab.
+  host.send({ type: 'SUBMIT_BLUFF', text: 'host bluff' });
+  await sleep(100);
+
+  const before = host.state.phase;
+  await sleep(DEADLINE_SECONDS * 1000 + 800);
+
+  check('P4', 'an expired deadline advances the phase on whoever did act',
+    host.state.phase === 'voting',
+    `phase before deadline '${before}', after expiry '${host.state.phase}' (expected 'voting')`);
+
+  [host, p1].forEach(c => { try { c.ws.close(); } catch {} });
+}
+
 (async () => {
   PORT = await freePort();
   const srv = spawn(process.execPath, ['server.js'], {
     cwd: __dirname,
-    env: { ...process.env, PORT, HEARTBEAT_MS },
+    env: { ...process.env, PORT, HEARTBEAT_MS, DEADLINE_SCALE },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   const up = new Promise((res, rej) => {
@@ -167,6 +247,8 @@ async function testP2() {
   try {
     await testP1();
     await testP2();
+    await testP3();
+    await testP4();
   } finally {
     srv.kill();
   }
