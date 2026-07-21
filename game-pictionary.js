@@ -202,4 +202,28 @@ function sanitizeForPlayer(room, playerIdx) {
   };
 }
 
-module.exports = { PAINT_COLORS, initRoom, startRound, processGuess, sanitizeForPlayer };
+// D1: same defect class as bluff — allDifficultyVoted only ran from inside a message
+// handler, so 'vote' hung once the last outstanding voter dropped. Plus the case the
+// server half can't cover: the artist is the only player who can advance 'drawing',
+// so their leaving strands everyone else with no way out but "End game".
+function onPlayerLeft(room, playerIdx) {
+  if (room.phase === 'vote') {
+    const connected = room.players.filter(p => p.connected).length;
+    if (connected > 0 && allDifficultyVoted(room)) {
+      const winner = room.guesses.find(g => g.correct);
+      revealScore(room, winner ? winner.playerIdx : null);
+    }
+    return { ok: true };
+  }
+
+  // Artist dropped mid-round. Nobody else can paint or end the round, so score it out
+  // rather than leaving the room stuck. A correct guess already banked still counts —
+  // the guessers earned it before the artist left; only an unguessed word scores null.
+  if ((room.phase === 'drawing' || room.phase === 'guessed') && playerIdx === room.artistIdx) {
+    const winner = room.guesses.find(g => g.correct);
+    revealScore(room, winner ? winner.playerIdx : null);
+  }
+  return { ok: true };
+}
+
+module.exports = { PAINT_COLORS, initRoom, startRound, processGuess, sanitizeForPlayer, onPlayerLeft };

@@ -221,4 +221,26 @@ function sanitizeForPlayer(room, playerIdx) {
   };
 }
 
-module.exports = { initRoom, startRound, processGuess, sanitizeForPlayer };
+// D1: the completion checks below only ever ran from inside a message handler, so a
+// phase waiting on the last outstanding player hung forever once that player dropped —
+// no further message could arrive to unstick it. server.js calls this after a
+// disconnect, with connected/hostIdx bookkeeping already done. Mutate and return;
+// server.js owns the timer policy and the broadcast.
+function onPlayerLeft(room) {
+  // Idempotent: it can fire for a phase where it means nothing, or twice for one player.
+  if (room.phase !== 'writing' && room.phase !== 'voting') return { ok: true };
+
+  // connectedPlayers().every() is vacuously true on an empty room, which would
+  // advance a room nobody is left in. Require someone to advance on behalf of.
+  if (connectedPlayers(room).length === 0) return { ok: true };
+
+  if (room.phase === 'writing') {
+    // Nothing to vote on if everyone who wrote something has also gone.
+    if (room.submissions.length > 0 && allPlayersSubmitted(room)) beginVoting(room);
+  } else if (allPlayersVoted(room)) {
+    revealScore(room);
+  }
+  return { ok: true };
+}
+
+module.exports = { initRoom, startRound, processGuess, sanitizeForPlayer, onPlayerLeft };
