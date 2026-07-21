@@ -832,7 +832,6 @@ function render(){
 
   if(state.gameType==='trivia'){
     el('board').style.display='none';
-    el('triviaArea').style.display='flex';
     el('bluffArea').style.display='none';
     el('pictArea').style.display='none';
     el('clueBar').style.display='none';
@@ -840,10 +839,17 @@ function render(){
     el('panel').style.display='none';
     el('mobileBar').classList.remove('active');
     el('app').classList.remove('bar-open');
-    renderTriviaHeader();
-    renderScores();
-    renderTriviaArea();
-    renderTimer();
+    if(phase==='over'){
+      el('triviaArea').style.display='none';
+      renderTriviaHeader();
+      renderScores();
+    } else {
+      el('triviaArea').style.display='flex';
+      renderTriviaHeader();
+      renderScores();
+      renderTriviaArea();
+      renderTimer();
+    }
     return;
   }
 
@@ -1054,6 +1060,7 @@ function renderGameHeader(){
     phaseEl.textContent=`🏆 ${winners} win${winners.includes('&')?'':'s'}!`;
     subEl.textContent='Thanks for playing — final scores above.';
     addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
+    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
 
   addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
@@ -1233,6 +1240,7 @@ function renderTriviaHeader(){
     phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
     subEl.textContent='Final scores above.';
     addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
+    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
 
   addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
@@ -1335,6 +1343,7 @@ function renderBluffHeader(){
     phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
     subEl.textContent='Final scores above.';
     addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
+    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
   addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
   if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
@@ -1476,6 +1485,7 @@ function renderPictHeader(){
     phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
     subEl.textContent='Final scores above.';
     addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
+    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
   addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
   if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
