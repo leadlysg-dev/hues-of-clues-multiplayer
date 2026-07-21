@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="modern">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -15,6 +15,98 @@
     --border:rgba(148,163,184,0.1); --shadow:0 4px 24px rgba(0,0,0,0.5);
     --shadow-lg:0 12px 48px rgba(0,0,0,0.7); --radius:10px; --radius-lg:16px;
   }
+
+  /* ===== RETRO (PICO-8) SKIN ===== */
+  [data-theme="retro"]{
+    --bg:#000000; --panel:#1d2b53; --panel2:#7e2553; --text:#fff1e8; --muted:#83769c;
+    --accent:#ffec27; --pink:#ff77a8; --blue:#29adff; --green:#00e436;
+    --border:#7e2553; --shadow:4px 4px 0 #000; --shadow-lg:6px 6px 0 #000;
+    --radius:0px; --radius-lg:0px;
+  }
+  [data-theme="retro"] *{font-family:'Courier New','Lucida Console',monospace !important; letter-spacing:0.5px;}
+  [data-theme="retro"] button{
+    border:2px solid var(--text) !important; border-radius:0 !important;
+    box-shadow:3px 3px 0 var(--text); transition:none; text-transform:uppercase; letter-spacing:1px;
+  }
+  [data-theme="retro"] button:active:not(:disabled){
+    transform:translate(2px,2px) !important; box-shadow:1px 1px 0 var(--text);
+  }
+  [data-theme="retro"] button:hover:not(:disabled){filter:none; background:var(--panel2);}
+  [data-theme="retro"] body::before{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);
+  }
+  [data-theme="retro"] header{
+    border:2px solid var(--border) !important; border-radius:0 !important;
+    backdrop-filter:none !important; background:var(--panel) !important;
+  }
+  [data-theme="retro"] .panel,[data-theme="retro"] #board{
+    border:2px solid var(--border) !important; border-radius:0 !important;
+  }
+  [data-theme="retro"] .setup-card,[data-theme="retro"] .lobby-card,[data-theme="retro"] .htp-card{
+    border:2px solid var(--text) !important; box-shadow:6px 6px 0 var(--text) !important;
+    border-radius:0 !important;
+  }
+  [data-theme="retro"] .timer{text-shadow:2px 2px 0 rgba(0,0,0,0.8); letter-spacing:4px;}
+  [data-theme="retro"] .code-display{text-shadow:3px 3px 0 var(--accent); letter-spacing:16px; animation:blink 1s step-start infinite;}
+  [data-theme="retro"] .chip.turn{animation:pixelBounce 0.4s steps(2) infinite; border:2px solid var(--accent) !important; box-shadow:0 0 0 1px var(--accent);}
+  [data-theme="retro"] .cell.guessable:hover{outline:3px solid var(--accent) !important; outline-offset:-3px;}
+  [data-theme="retro"] .btn-accent{box-shadow:4px 4px 0 rgba(0,0,0,0.6) !important;}
+  [data-theme="retro"] #clueBar{border-radius:0 !important; border:2px solid rgba(255,236,39,0.4) !important;}
+  [data-theme="retro"] .chip{border-radius:0 !important; border:2px solid var(--border) !important;}
+  @keyframes pixelBounce{0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)}}
+  @keyframes blink{0%,49%{opacity:1} 50%,100%{opacity:0}}
+
+  /* ===== SKIN TOGGLE BUTTON ===== */
+  #skinToggle{
+    position:fixed; top:12px; right:12px; z-index:200;
+    background:var(--panel); border:1px solid var(--border); border-radius:20px;
+    color:var(--muted); font-size:12px; font-weight:600; padding:6px 14px;
+    cursor:pointer; user-select:none; white-space:nowrap;
+    box-shadow:var(--shadow); transition:opacity 150ms ease;
+  }
+  #skinToggle:hover{opacity:0.85;}
+  [data-theme="retro"] #skinToggle{border-radius:0; border:2px solid var(--text); box-shadow:3px 3px 0 var(--text);}
+
+  /* ===== MODERN MICRO-INTERACTIONS ===== */
+  @keyframes markerPop{from{transform:scale(0) rotate(-15deg);opacity:0} to{transform:scale(1) rotate(0);opacity:1}}
+  .marker{animation:markerPop 220ms cubic-bezier(0.34,1.56,0.64,1) forwards;}
+
+  @keyframes deltaFloat{
+    0%{transform:translateY(8px) scale(0.7);opacity:0}
+    60%{transform:translateY(-3px) scale(1.15);opacity:1}
+    100%{transform:translateY(0) scale(1);opacity:1}
+  }
+  .chip .delta{animation:deltaFloat 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;}
+
+  @keyframes slideIn{from{transform:translateX(-12px);opacity:0} to{transform:translateX(0);opacity:1}}
+  .lobby-player{animation:slideIn 200ms ease forwards;}
+
+  @keyframes starReveal{
+    0%{transform:scale(0) rotate(-180deg);opacity:0}
+    70%{transform:scale(1.35) rotate(10deg)}
+    100%{transform:scale(1) rotate(0);opacity:1}
+  }
+  .cell.target::after{
+    animation:starReveal 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards, starPulse 1.2s ease-in-out 0.4s infinite alternate !important;
+  }
+
+  @keyframes turnGlow{
+    from{box-shadow:0 0 0 1px rgba(251,191,36,0.15),0 0 8px rgba(251,191,36,0.06);}
+    to{box-shadow:0 0 0 1px rgba(251,191,36,0.45),0 0 22px rgba(251,191,36,0.18);}
+  }
+  .chip.turn{animation:turnGlow 1.5s ease-in-out infinite alternate;}
+
+  @keyframes urgentPulse{
+    from{opacity:1;text-shadow:0 0 14px var(--pink);}
+    to{opacity:0.45;text-shadow:0 0 4px var(--pink);}
+  }
+  .timer.low{animation:urgentPulse 0.4s ease-in-out infinite alternate !important;}
+
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none}}
+  .screen-fade-in{animation:fadeIn 200ms ease forwards;}
+
+  button:active:not(:disabled){transform:scale(0.94); transition:transform 60ms ease;}
   *{box-sizing:border-box; margin:0; padding:0; user-select:none;
      font-family:system-ui,-apple-system,'Segoe UI',sans-serif;}
   html,body{height:100%;}
@@ -359,6 +451,9 @@
 </style>
 </head>
 <body>
+
+<!-- ============ SKIN TOGGLE ============ -->
+<div id="skinToggle" onclick="cycleSkin()">✨ Modern</div>
 
 <!-- ============ ROTATE HINT (portrait mobile, in-game only) ============ -->
 <div id="rotateHint">
@@ -797,6 +892,7 @@ function renderScores(){
       ${state.phase==='score'&&state.lastDeltas[i]>0?`<span class="delta">+${state.lastDeltas[i]}</span>`:''}<span class="pts">${p.score}</span>`;
     s.appendChild(c);
   });
+  if(state.phase==='score') animateScoreCountUp();
 }
 
 /* ====== BOARD ====== */
@@ -1050,6 +1146,39 @@ function dismissHtp(){
 
 // Boot into landing
 el('landing').style.display='flex';
+
+/* ====== SKIN SYSTEM ====== */
+const SKINS=['modern','retro'];
+let currentSkin='modern';
+function applySkin(skin){
+  currentSkin=skin;
+  document.documentElement.setAttribute('data-theme',skin);
+  const btn=el('skinToggle');
+  if(btn) btn.textContent=skin==='retro'?'⚡ Retro':'✨ Modern';
+  try{localStorage.setItem('hoc-skin',skin);}catch(e){}
+}
+function cycleSkin(){applySkin(currentSkin==='modern'?'retro':'modern');}
+(function(){try{const s=localStorage.getItem('hoc-skin');if(s&&SKINS.includes(s))applySkin(s);}catch(e){}})();
+
+/* ====== MODERN ANIMATIONS ====== */
+// animateScoreCountUp() is called at the end of renderScores() when state.phase==='score'
+function animateScoreCountUp(){
+  if(!state||state.phase!=='score') return;
+  document.querySelectorAll('.chip .pts').forEach((ptEl,i)=>{
+    const target=parseInt(ptEl.textContent,10);
+    if(isNaN(target)||!state.lastDeltas) return;
+    const delta=state.lastDeltas[i]||0;
+    if(delta<=0) return;
+    const start=target-delta;
+    let current=start;
+    const step=()=>{
+      current=Math.min(target,current+1);
+      ptEl.textContent=current;
+      if(current<target) requestAnimationFrame(step);
+    };
+    setTimeout(()=>requestAnimationFrame(step),i*80);
+  });
+}
 </script>
 </body>
 </html>
