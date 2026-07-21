@@ -4,10 +4,15 @@
   "description": "Real-time multiplayer Hues of Clues",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test-disconnect.js && node test-platform.js && node test-client-deadline.js",
+    "capture": "node capture.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
   },
   "engines": {
     "node": ">=18"

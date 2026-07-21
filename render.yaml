@@ -3,7 +3,10 @@ services:
     name: hues-of-clues
     env: node
     plan: free
-    buildCommand: npm install
+    # --omit=dev explicitly, not by relying on Render defaulting NODE_ENV=production.
+    # A test-only dependency must never be able to reach a free-tier production install,
+    # and nobody should have to know an env-var default to be sure of that.
+    buildCommand: npm install --omit=dev
     startCommand: node server.js
     # Explicitly off. Render's Blueprint default is on, which would make the first
     # push to origin/main a live release to real users rather than a push to a repo —
