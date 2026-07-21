@@ -375,7 +375,159 @@
 
 <!-- ============ HOW TO PLAY ============ -->
 <div id="howToPlay" style="display:none">
-  <div class="htp-card">
+
+  <!-- SPECTRUM -->
+  <div class="htp-card" data-htp-game="spectrum">
+    <h2>How to Play 🌈 Spectrum</h2>
+    <div class="htp-sub">Each player on their own device. You'll need a voice or video call to give clues out loud.</div>
+
+    <div class="htp-step">
+      <div class="htp-num">1</div>
+      <div class="htp-text">The host <b>creates a room</b> and shares the 4-letter code. Everyone else opens this page and joins.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">2</div>
+      <div class="htp-text">Each round, one player is the <b>Cue Giver</b> 🎤. They see a secret word and its exact position on a spectrum between two opposites — nobody else can see where it lands.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">3</div>
+      <div class="htp-text">The Cue Giver says <b>one word or phrase out loud</b> that hints where the secret falls on the spectrum. <span class="dim">("Monday morning", "a perfect steak", "rush hour"…)</span></div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">4</div>
+      <div class="htp-text">Everyone else <b>clicks a column</b> on the spectrum bar — pick how far left or right you think the secret sits. One guess each.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">5</div>
+      <div class="htp-text">The secret position is revealed. Points for how close you guessed. All players rotate as Cue Giver — <b>most points wins</b>.</div>
+    </div>
+
+    <hr class="htp-divider">
+    <div style="font-size:13px;color:var(--pink);font-weight:900;margin-bottom:12px;letter-spacing:1px;">SCORING</div>
+    <div class="htp-score">
+      <div class="htp-score-item"><span class="htp-pts">3</span><span>Exact column</span></div>
+      <div class="htp-score-item"><span class="htp-pts">2</span><span>±1 column</span></div>
+      <div class="htp-score-item"><span class="htp-pts">1</span><span>±2 columns</span></div>
+    </div>
+
+    <button class="btn-htp" onclick="dismissHtp()">🎮 Got it — let's play!</button>
+    <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
+  </div>
+
+  <!-- TRIVIA -->
+  <div class="htp-card" data-htp-game="trivia" style="display:none">
+    <h2>How to Play 🧠 Rapid Fire Trivia</h2>
+    <div class="htp-sub">Race to buzz in first and answer questions across 6 categories.</div>
+
+    <div class="htp-step">
+      <div class="htp-num">1</div>
+      <div class="htp-text">The host <b>creates a room</b> and shares the 4-letter code. Everyone joins. The host picks the first question.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">2</div>
+      <div class="htp-text">When a question appears, hit <b>BUZZ</b> to ring in. First buzz wins — there's a <b>3-second window</b> for anyone to steal the buzz.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">3</div>
+      <div class="htp-text">The buzzer <b>answers out loud</b>. The host taps <b style="color:var(--green);">✓ Correct</b> or <b style="color:var(--pink);">✗ Wrong</b>.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">4</div>
+      <div class="htp-text">Correct answer earns a point. Wrong answer earns nothing and the round ends there — the answer is revealed, then the next question starts.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">5</div>
+      <div class="htp-text">Keep going through the question bank. <b>Most points when questions run out wins.</b></div>
+    </div>
+
+    <hr class="htp-divider">
+    <div style="font-size:13px;color:var(--pink);font-weight:900;margin-bottom:12px;letter-spacing:1px;">SCORING</div>
+    <div class="htp-score">
+      <div class="htp-score-item"><span class="htp-pts">1</span><span>Correct answer</span></div>
+      <div class="htp-score-item"><span class="htp-pts" style="color:var(--muted);">0</span><span>Wrong / no buzz</span></div>
+    </div>
+
+    <button class="btn-htp" onclick="dismissHtp()">🧠 Got it — let's play!</button>
+    <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
+  </div>
+
+  <!-- BLUFF -->
+  <div class="htp-card" data-htp-game="bluff" style="display:none">
+    <h2>How to Play 🃏 Bluff the Board</h2>
+    <div class="htp-sub">Write fake facts convincing enough to fool your friends.</div>
+
+    <div class="htp-step">
+      <div class="htp-num">1</div>
+      <div class="htp-text">The board highlights a cell. A <b>real fact</b> about that color is loaded — only you can read it privately.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">2</div>
+      <div class="htp-text"><b>Write a fake fact</b> in the text box (max 80 characters). Make it believable — everyone is trying to fool everyone else.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">3</div>
+      <div class="htp-text">All submissions — the real fact plus everyone's bluffs — are <b>shuffled and shown anonymously</b>. Nobody knows which is which.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">4</div>
+      <div class="htp-text"><b>Tap the fact you think is real.</b> Everyone votes at the same time.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">5</div>
+      <div class="htp-text">The real fact is revealed along with who wrote each bluff. Points awarded, next round begins.</div>
+    </div>
+
+    <hr class="htp-divider">
+    <div style="font-size:13px;color:var(--pink);font-weight:900;margin-bottom:12px;letter-spacing:1px;">SCORING</div>
+    <div class="htp-score">
+      <div class="htp-score-item"><span class="htp-pts">2</span><span>Spotted the real fact</span></div>
+      <div class="htp-score-item"><span class="htp-pts pink">+1</span><span>Per vote your bluff attracted</span></div>
+    </div>
+
+    <button class="btn-htp" onclick="dismissHtp()">🃏 Got it — let's play!</button>
+    <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
+  </div>
+
+  <!-- PICTIONARY -->
+  <div class="htp-card" data-htp-game="pictionary" style="display:none">
+    <h2>How to Play ✏️ Pixel Pictionary</h2>
+    <div class="htp-sub">Draw on the board and let your friends guess what it is.</div>
+
+    <div class="htp-step">
+      <div class="htp-num">1</div>
+      <div class="htp-text">Each round, one player is the <b>Artist</b> 🖼️. They get a secret word — nobody else can see it.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">2</div>
+      <div class="htp-text"><b>Artist:</b> hover a cell and click to paint it. Click a painted cell to cycle through 8 colors or erase. You have <b>90 seconds.</b></div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">3</div>
+      <div class="htp-text"><b>Guessers:</b> type your guess in the box at the bottom. You can guess as many times as you like — the secret word is censored until someone gets it.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">4</div>
+      <div class="htp-text">The <b>first correct guess</b> ends the round. The word is revealed and points are awarded.</div>
+    </div>
+    <div class="htp-step">
+      <div class="htp-num">5</div>
+      <div class="htp-text">After each round, everyone <b>votes on how hard</b> the word was. Then the next artist goes.</div>
+    </div>
+
+    <hr class="htp-divider">
+    <div style="font-size:13px;color:var(--pink);font-weight:900;margin-bottom:12px;letter-spacing:1px;">SCORING</div>
+    <div class="htp-score">
+      <div class="htp-score-item"><span class="htp-pts">2</span><span>First correct guesser</span></div>
+      <div class="htp-score-item"><span class="htp-pts pink">+1</span><span>Artist, when guessed</span></div>
+      <div class="htp-score-item"><span class="htp-pts" style="color:var(--muted);">0</span><span>No guess in time</span></div>
+    </div>
+
+    <button class="btn-htp" onclick="dismissHtp()">✏️ Got it — let's play!</button>
+    <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
+  </div>
+
+  <!-- ORIGINAL HUES (legacy fallback) -->
+  <div class="htp-card" data-htp-game="hues">
     <h2>How to Play 🎨</h2>
     <div class="htp-sub">Each player is on their own device. You'll need a voice or video call to give clues out loud.</div>
 
@@ -1550,12 +1702,20 @@ el('mobileTypeInput').addEventListener('input',e=>{
 
 /* ====== HOW TO PLAY ====== */
 function openHtp(){
+  const game=selectedGameType||'spectrum';
+  const cards=el('howToPlay').querySelectorAll('.htp-card');
+  let active=null;
+  cards.forEach(c=>{
+    const match=c.dataset.htpGame===game;
+    c.style.display=match?'':'none';
+    if(match)active=c;
+  });
+  if(!active){active=el('howToPlay').querySelector('.htp-card');active.style.display='';}
   el('howToPlay').style.display='flex';
-  const card=el('howToPlay').querySelector('.htp-card');
   el('htpScrollHint').style.display='';
-  card.scrollTop=0;
-  card.onscroll=()=>{
-    const atBottom=card.scrollHeight-card.scrollTop-card.clientHeight<20;
+  active.scrollTop=0;
+  active.onscroll=()=>{
+    const atBottom=active.scrollHeight-active.scrollTop-active.clientHeight<20;
     el('htpScrollHint').style.opacity=atBottom?'0':'';
     el('htpScrollHint').style.pointerEvents=atBottom?'none':'';
   };
