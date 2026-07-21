@@ -4,7 +4,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
-const game = require('./game');
+const game = require('./game-router');
+const timer = require('./timer');
 
 const PORT = process.env.PORT || 3000;
 const ROOM_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2 hours inactivity
@@ -47,28 +48,41 @@ function broadcastState(room) {
   });
 }
 
+// Starts (or restarts) the turn timer for a room.
+// Expiry routes through processGuess so each game module controls the consequence.
 function startRoomTimer(room) {
-  stopRoomTimer(room);
   if (!room.settings.turnSeconds) return;
   room.timerSeconds = room.settings.turnSeconds;
-  room.timerId = setInterval(() => {
-    room.timerSeconds = Math.max(0, room.timerSeconds - 1);
-    broadcastState(room);
-    if (room.timerSeconds <= 0) {
-      stopRoomTimer(room);
-      game.skipTurn(room);
+  timer.startTimer(room, 'turn', room.settings.turnSeconds,
+    (rem) => {
+      room.timerSeconds = rem;
+      broadcastState(room);
+    },
+    () => {
+      room.timerSeconds = 0;
+      game.processGuess(room, null, { type: 'TIMER_EXPIRE' });
       if (room.phase === 'guess' && room.turnQueue.length > 0) {
         startRoomTimer(room);
       } else {
         broadcastState(room);
       }
     }
-  }, 1000);
+  );
 }
 
 function stopRoomTimer(room) {
-  if (room.timerId) { clearInterval(room.timerId); room.timerId = null; }
+  timer.stopTimer(room, 'turn');
   room.timerSeconds = 0;
+}
+
+// After any game action, apply this uniform timer policy:
+// guess phase with a pending guesser → restart turn timer; otherwise → stop it.
+function applyTimerPolicy(room) {
+  if (room.phase === 'guess' && room.turnQueue.length > 0) {
+    startRoomTimer(room);
+  } else {
+    stopRoomTimer(room);
+  }
 }
 
 wss.on('connection', (ws) => {
@@ -81,8 +95,11 @@ wss.on('connection', (ws) => {
     if (type === 'CREATE_ROOM') {
       const name = (msg.name || '').trim().slice(0, 16);
       if (!name) return send(ws, { type: 'ERROR', message: 'Name required' });
+      const gameType = (msg.gameType || 'spectrum').toLowerCase();
       const code = genCode();
-      const room = game.createRoom(code, name, { turnSeconds: msg.turnSeconds });
+      let room;
+      try { room = game.createRoom(code, name, { turnSeconds: msg.turnSeconds }, gameType); }
+      catch (e) { return send(ws, { type: 'ERROR', message: e.message }); }
       room.players[0].ws = ws;
       rooms.set(code, room);
       wsToPlayer.set(ws, { code, playerIdx: 0 });
@@ -152,47 +169,19 @@ wss.on('connection', (ws) => {
         break;
       }
 
-      case 'CLUE_READY': {
-        if (playerIdx !== room.cueGiver) return send(ws, { type: 'ERROR', message: 'Only the cue giver can do this' });
-        if (room.phase !== 'ready') return send(ws, { type: 'ERROR', message: 'Not in ready phase' });
-        game.beginGuessing(room, msg.clue);
-        if (room.phase === 'guess' && room.turnQueue.length > 0) startRoomTimer(room);
-        broadcastState(room);
-        break;
-      }
-
-      case 'PLACE_GUESS': {
-        const result = game.placeGuess(room, playerIdx, msg.r, msg.c);
-        if (!result.ok) return send(ws, { type: 'ERROR', message: result.error });
-        if (room.phase === 'score') {
-          stopRoomTimer(room);
-        } else if (room.turnQueue.length > 0) {
-          startRoomTimer(room);
+      // All in-game player actions route through the game module via processGuess.
+      case 'CLUE_READY':
+      case 'PLACE_GUESS':
+      case 'SKIP_TURN':
+      case 'UNDO_LAST':
+      case 'NEXT_ROUND':
+      case 'PLAY_AGAIN': {
+        const result = game.processGuess(room, playerIdx, msg);
+        if (result && !result.ok) {
+          if (!result.silent) send(ws, { type: 'ERROR', message: result.error });
+          break;
         }
-        broadcastState(room);
-        break;
-      }
-
-      case 'SKIP_TURN': {
-        if (room.phase !== 'guess') break;
-        stopRoomTimer(room);
-        game.skipTurn(room);
-        if (room.phase === 'guess' && room.turnQueue.length > 0) startRoomTimer(room);
-        broadcastState(room);
-        break;
-      }
-
-      case 'UNDO_LAST': {
-        if (game.undoLast(room)) {
-          startRoomTimer(room);
-          broadcastState(room);
-        }
-        break;
-      }
-
-      case 'NEXT_ROUND': {
-        if (room.phase !== 'score') break;
-        game.nextRound(room);
+        applyTimerPolicy(room);
         broadcastState(room);
         break;
       }
@@ -201,14 +190,6 @@ wss.on('connection', (ws) => {
         stopRoomTimer(room);
         room.phase = 'over';
         room.lastActivity = Date.now();
-        broadcastState(room);
-        break;
-      }
-
-      case 'PLAY_AGAIN': {
-        if (room.phase !== 'over') break;
-        stopRoomTimer(room);
-        game.playAgain(room);
         broadcastState(room);
         break;
       }
@@ -232,13 +213,11 @@ wss.on('connection', (ws) => {
     p.ws = null;
     room.lastActivity = Date.now();
 
-    // If it was this player's turn to guess, skip them
+    // If it was this player's turn to guess, skip them and manage the timer.
     if (room.phase === 'guess' && room.turnQueue[0] === playerIdx) {
       stopRoomTimer(room);
-      game.skipTurn(room);
-      if (room.phase === 'guess' && room.turnQueue.length > 0) {
-        startRoomTimer(room);
-      }
+      game.processGuess(room, playerIdx, { type: 'SKIP_TURN' });
+      applyTimerPolicy(room);
     }
 
     // If host disconnected in lobby, promote next connected player
@@ -252,12 +231,12 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Expire stale rooms every 15 minutes
+// Expire stale rooms every 15 minutes; stopAllTimers catches every named timer.
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms) {
     if (now - room.lastActivity > ROOM_EXPIRY_MS) {
-      stopRoomTimer(room);
+      timer.stopAllTimers(room);
       rooms.delete(code);
     }
   }
