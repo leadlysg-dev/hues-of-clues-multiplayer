@@ -42,12 +42,16 @@ const VIEWPORTS = [
 // report what it did NOT reach — a capture run that silently skips a phase is exactly
 // the "green that describes something else" failure we keep finding.
 const PHASES_BY_GAME = {
+  hues: ['ready', 'guess'],
   spectrum: ['ready', 'guess'],
   trivia: ['question', 'buzzed', 'judging'],
   bluff: ['reveal', 'writing', 'voting'],
   pictionary: ['drawing', 'guessed', 'timeout', 'vote'],
 };
 const SHARED_PHASES = ['lobby', 'score', 'over'];
+
+// Mirrors PAINT_COLORS in game-pictionary.js — the server validates the exact string.
+const PAINT_COLORS = ['#fff1e8','#ffec27','#ff004d','#ff77a8','#00e436','#29adff','#1d2b53','#000000'];
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -97,86 +101,177 @@ async function table(port, gameType, count) {
     await sleep(80);
     others.push(p);
   }
-  return { host, others, all: [host, ...others] };
+  const t = { host, others, all: [host, ...others], extra: {} };
+  // A phase's FIRST state is what a player arrives on, which for a board game is an
+  // empty board. That is a real screen, but it is not the screen anyone plays on, and
+  // a directory of empty boards reads as coverage while showing nothing. snap() lets a
+  // driver also record the mid-phase state — board painted, markers placed.
+  t.snap = label => { if (!t.extra[label]) t.extra[label] = t.host.state; };
+  return t;
 }
 
-// Each driver walks one game as far as it can. The viewer is always the host, so the
-// fixtures are one consistent player's view rather than a stitched-together composite.
+// Each driver plays ONE round of its game and returns. The runner loops it, taking
+// NEXT_ROUND out of 'score' each time, until the room reaches 'over' — because 'over'
+// is a real screen a player lands on and the previous version of this harness could
+// never reach it. `count` is the table size; every fixture is the host's sanitized
+// view, so a capture is one consistent player's screen rather than a composite.
 const DRIVERS = {
-  async spectrum(port) {
-    const { host, others, all } = await table(port, 'spectrum', 4);
-    host.send({ type: 'START_GAME' });
-    await sleep(200);
-    all.forEach(p => p.send({ type: 'CLUE_READY' }));
-    await sleep(250);
-    for (const p of others) { p.send({ type: 'PLACE_GUESS', r: 6, c: 14 }); await sleep(150); }
-    await sleep(400);
-    return { host, all };
+  // hues and spectrum share a shape: cue giver gives a clue, then each guesser in
+  // turnQueue order places one cell. hues was missing entirely from this harness —
+  // five games ship, four were being captured.
+  hues: { count: 4, round: gridRound },
+  spectrum: { count: 4, round: gridRound },
+
+  trivia: {
+    count: 3,
+    async round(t) {
+      const buzzer = t.others[0];
+      buzzer.send({ type: 'BUZZ' });
+      await sleep(3400); // the real 3s buzz window has to close into 'judging'
+      t.host.send({ type: 'MARK_CORRECT' });
+      await sleep(250);
+    },
   },
 
-  async trivia(port) {
-    const { host, others, all } = await table(port, 'trivia', 3);
-    host.send({ type: 'START_GAME' });
-    await sleep(250);
-    others[0].send({ type: 'BUZZ' });
-    await sleep(300);
-    await sleep(3200); // let the real 3s buzz window close into 'judging'
-    host.send({ type: 'MARK_CORRECT' });
-    await sleep(300);
-    return { host, all };
+  bluff: {
+    count: 4,
+    async round(t) {
+      t.host.send({ type: 'START_WRITING' });
+      await sleep(250);
+      // One distinct lie per player: a repeated string renders as two identical options
+      // and reads like a client bug in the capture when it is only the fixture repeating.
+      const lies = [
+        'Blue was the last colour to get a name',
+        'Cyan is a shade of grief in Old Norse',
+        'Red reads as nearer than blue to the eye',
+        'Purple cost more than gold by weight',
+        'Green was banned in Victorian wallpaper',
+      ];
+      t.all.forEach((p, i) => p.send({ type: 'SUBMIT_BLUFF', text: lies[i] }));
+      await sleep(400);
+      // Vote by TEXT, not by index. Submissions are shuffled before display, so
+      // `(i + 1) % n` lands on your own bluff roughly a quarter of the time — the
+      // server rejects it, nobody notices, and the round sits in 'voting' until the
+      // 45s deadline rescues it. That is how the earlier run captured bluff/score by
+      // luck and lost it on the next one.
+      t.all.forEach((p, i) => {
+        const opts = p.state.submissions || [];
+        const pos = opts.findIndex(s => s.text !== lies[i]);
+        if (pos >= 0) p.send({ type: 'CAST_VOTE', votedIdx: pos });
+      });
+      await sleep(400);
+    },
   },
 
-  async bluff(port) {
-    const { host, others, all } = await table(port, 'bluff', 4);
-    host.send({ type: 'START_GAME' });
-    await sleep(250);
-    host.send({ type: 'START_WRITING' });
-    await sleep(250);
-    // One distinct lie per player: a repeated string renders as two identical options
-    // and reads like a client bug in the capture when it is only the fixture repeating.
-    const lies = [
-      'Blue was the last colour to get a name',
-      'Cyan is a shade of grief in Old Norse',
-      'Red reads as nearer than blue to the eye',
-      'Purple cost more than gold by weight',
-      'Green was banned in Victorian wallpaper',
-    ];
-    all.forEach((p, i) => p.send({ type: 'SUBMIT_BLUFF', text: lies[i] }));
-    await sleep(400);
-    // Vote for something that is not your own submission.
-    all.forEach((p, i) => p.send({ type: 'CAST_VOTE', votedIdx: (i + 1) % all.length }));
-    await sleep(400);
-    return { host, all };
-  },
-
-  async pictionary(port) {
-    const { host, others, all } = await table(port, 'pictionary', 4);
-    host.send({ type: 'START_GAME' });
-    await sleep(250);
-    const artist = all.find(p => p.idx === host.state.artistIdx);
-    const guesser = all.find(p => p.idx !== host.state.artistIdx);
-    // A few strokes so the board is not blank in the capture.
-    for (let i = 0; i < 12; i++) artist.send({ type: 'PAINT_CELL', r: 4 + (i % 5), c: 6 + i, color: i % 6 });
-    await sleep(250);
-    guesser.send({ type: 'SUBMIT_GUESS', text: artist.state.secretWord });
-    await sleep(300);
-    artist.send({ type: 'START_VOTE' });
-    await sleep(250);
-    all.filter(p => p.idx !== host.state.artistIdx)
-       .forEach(p => p.send({ type: 'SUBMIT_DIFFICULTY', vote: 'medium' }));
-    await sleep(400);
-    return { host, all };
+  pictionary: {
+    count: 4,
+    async round(t) {
+      const artistIdx = t.host.state.artistIdx;
+      const artist = t.all.find(p => p.idx === artistIdx);
+      const guesser = t.all.find(p => p.idx !== artistIdx);
+      // Colours are hex strings from PAINT_COLORS, not indices. Sending an index gets
+      // a { ok:false, silent:true } — every stroke this harness ever "painted" was
+      // silently dropped, so every pictionary capture was of a blank board.
+      for (let i = 0; i < 12; i++) artist.send({ type: 'PAINT_CELL', r: 4 + (i % 5), c: 6 + i, color: PAINT_COLORS[i % PAINT_COLORS.length] });
+      await sleep(250);
+      t.snap('drawing-painted');
+      guesser.send({ type: 'SUBMIT_GUESS', text: artist.state.secretWord });
+      await sleep(300);
+      artist.send({ type: 'START_VOTE' });
+      await sleep(250);
+      // Every connected player, artist included — allDifficultyVoted() counts the
+      // whole connected roster, so excluding the artist stalls the phase until the
+      // 30s deadline fires. The old driver excluded them.
+      t.all.forEach(p => p.send({ type: 'SUBMIT_DIFFICULTY', vote: 'medium' }));
+      await sleep(400);
+    },
   },
 };
 
+async function gridRound(t) {
+  const cue = t.all.find(p => p.idx === t.host.state.cueGiver);
+  cue.send({ type: 'CLUE_READY', clue: 'somewhere warm' });
+  await sleep(300);
+  // Walk the real turnQueue rather than assuming an order: whoever is up places a
+  // distinct cell. Forcing a guess out of turn is how the last suite passed 50/50
+  // against a phase the server would never actually produce.
+  let n = 0;
+  while (t.host.state.phase === 'guess' && n < 8) {
+    const idx = t.host.state.turnQueue[0];
+    const p = t.all.find(x => x.idx === idx);
+    if (!p) break;
+    p.send({ type: 'PLACE_GUESS', r: 5 + n, c: 8 + n * 3 });
+    n++;
+    await sleep(200);
+    if (n === 1) t.snap('guess-placed');
+  }
+  await sleep(250);
+}
+
+// Plays a game to completion, collecting the first state seen in every phase.
+async function playToOver(port, gameType, spec) {
+  const t = await table(port, gameType, spec.count);
+  t.host.send({ type: 'START_GAME' });
+  await sleep(300);
+  // Guard is a runaway stop, not an expected exit — if it fires, the phase is reported
+  // as NOT CAPTURED rather than quietly missing.
+  for (let guard = 0; guard < 40 && t.host.state && t.host.state.phase !== 'over'; guard++) {
+    if (t.host.state.phase === 'score') {
+      t.host.send({ type: 'NEXT_ROUND' });
+      await sleep(300);
+      continue;
+    }
+    await spec.round(t);
+  }
+  await sleep(200);
+  // Say where it actually stopped. A driver that stalls mid-game otherwise shows up
+  // only as a missing phase at the end, with no clue which round it died in.
+  if (t.host.state.phase !== 'over') {
+    console.log(`    stopped in phase '${t.host.state.phase}' at round ${t.host.state.round + 1}/${t.host.state.totalRounds}`);
+  }
+  return t;
+}
+
+// Pictionary 'timeout' is only reachable by letting the real 90s drawing timer expire:
+// the server takes no client TIMER_EXPIRE, and shortening the round timer means editing
+// server.js, which is GEORGE's. So the harness waits it out — one 95s table, once.
+async function pictionaryTimeout(port) {
+  const t = await table(port, 'pictionary', 3);
+  t.host.send({ type: 'START_GAME' });
+  await sleep(300);
+  const artist = t.all.find(p => p.idx === t.host.state.artistIdx);
+  for (let i = 0; i < 10; i++) artist.send({ type: 'PAINT_CELL', r: 6 + (i % 4), c: 10 + i, color: PAINT_COLORS[i % PAINT_COLORS.length] });
+  const deadline = Date.now() + 110000;
+  while (Date.now() < deadline && t.host.state.phase === 'drawing') {
+    await sleep(5000);
+    console.log(`    drawing… timerSeconds=${t.host.state.timerSeconds}`);
+  }
+  console.log(`    ended in phase '${t.host.state.phase}'`);
+  await sleep(300);
+  return t;
+}
+
 async function collect(port) {
   const fixtures = {};
-  for (const [gameType, drive] of Object.entries(DRIVERS)) {
-    const { host, all } = await drive(port);
-    for (const [phase, state] of host.seen) fixtures[`${gameType}/${phase}`] = state;
-    all.forEach(p => { try { p.ws.close(); } catch {} });
-    await sleep(120);
+  const take = (gameType, t) => {
+    for (const [label, state] of Object.entries(t.extra)) {
+      const k = `${gameType}/${label}`;
+      if (!fixtures[k]) fixtures[k] = state;
+    }
+    for (const [phase, state] of t.host.seen) {
+      const k = `${gameType}/${phase}`;
+      if (!fixtures[k]) fixtures[k] = state;
+    }
+    t.all.forEach(p => { try { p.ws.close(); } catch {} });
+  };
+
+  for (const [gameType, spec] of Object.entries(DRIVERS)) {
+    console.log(`  ${gameType}...`);
+    take(gameType, await playToOver(port, gameType, spec));
+    await sleep(150);
   }
+  console.log('  pictionary/timeout (waiting out the real 90s round timer)...');
+  take('pictionary', await pictionaryTimeout(port));
   return fixtures;
 }
 
@@ -271,7 +366,22 @@ async function render(serverPort, fixtures) {
     for (const vp of VIEWPORTS) {
       await c.send('Emulation.setDeviceMetricsOverride', vp);
       await sleep(150);
+      let lastGame = null;
       for (const [key, state] of Object.entries(fixtures)) {
+        const gameOfKey = key.split('/')[0];
+        // Reload between games. Fixtures are replayed into one long-lived page, and
+        // the client does not clear another game's board on a gameType change — the
+        // first landscape spectrum capture came out with pictionary's painted cells
+        // still sitting on the grid. That is a plausible client bug in its own right
+        // (leave a pictionary game, join a spectrum one, same page load) and it is
+        // raised as one, but a capture must not show a state no player could reach.
+        if (gameOfKey !== lastGame) {
+          const reloaded = c.once('Page.loadEventFired');
+          await c.send('Page.navigate', { url: `http://127.0.0.1:${serverPort}/` });
+          await reloaded;
+          await sleep(350);
+          lastGame = gameOfKey;
+        }
         for (const skin of SKINS) {
           // rotateDismissed is forced: the interstitial is a real screen, but it is not
           // the screen under test, and leaving it up hides every game behind it.
@@ -350,8 +460,10 @@ async function render(serverPort, fixtures) {
     console.log('collecting states from real gameplay...');
     fixtures = await collect(serverPort);
     fs.writeFileSync(path.join(__dirname, 'capture-fixtures.json'), JSON.stringify(fixtures, null, 2));
-    console.log(`captured ${Object.keys(fixtures).length} states\nrendering...`);
-    shot = await render(serverPort, fixtures);
+    console.log(`captured ${Object.keys(fixtures).length} states`);
+    // --collect-only: fixture work is seconds, rendering is minutes. Iterating on a
+    // driver should not cost a full screenshot pass.
+    shot = process.argv.includes('--collect-only') ? [] : (console.log('rendering...'), await render(serverPort, fixtures));
   } finally {
     srv.kill();
   }
@@ -366,7 +478,12 @@ async function render(serverPort, fixtures) {
   const missing = want.filter(k => !got.has(k));
 
   console.log(`\n${shot.length} screenshots → ${path.relative(process.cwd(), OUT_DIR)}/`);
-  console.log(`${got.size}/${want.length} phase-views captured`);
+  // Count canonical phases only. Mid-phase extras are bonus artefacts and must not
+  // inflate the coverage number into something like "32/29", which reads as a pass
+  // while saying nothing about whether every phase was reached.
+  const covered = want.filter(k => got.has(k)).length;
+  const extras = got.size - covered;
+  console.log(`${covered}/${want.length} phase-views captured${extras ? ` (+${extras} mid-phase extras)` : ''}`);
   if (missing.length) {
     console.log(`\nNOT CAPTURED — no screenshot exists for these, they are unverified:`);
     for (const m of missing) console.log(`  ${m}`);
