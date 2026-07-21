@@ -1,72 +1,43 @@
 'use strict';
 
-const QUESTIONS = [
-  { text: 'What is the largest planet in the solar system?', options: ['Mars', 'Saturn', 'Jupiter', 'Neptune'], correctIdx: 2 },
-  { text: 'How many sides does a hexagon have?', options: ['Five', 'Six', 'Seven', 'Eight'], correctIdx: 1 },
-  { text: 'What country is credited with inventing pizza?', options: ['Greece', 'France', 'Spain', 'Italy'], correctIdx: 3 },
-  { text: 'What is the capital city of Australia?', options: ['Sydney', 'Melbourne', 'Canberra', 'Brisbane'], correctIdx: 2 },
-  { text: 'How many strings does a standard guitar have?', options: ['4', '5', '6', '7'], correctIdx: 2 },
-  { text: 'What gas do plants absorb from the atmosphere to make food?', options: ['Oxygen', 'Nitrogen', 'Carbon dioxide', 'Hydrogen'], correctIdx: 2 },
-  { text: 'Which element has the chemical symbol Au?', options: ['Silver', 'Aluminium', 'Copper', 'Gold'], correctIdx: 3 },
-  { text: 'In what year did the Berlin Wall fall?', options: ['1987', '1989', '1991', '1993'], correctIdx: 1 },
-  { text: 'What is the fastest land animal?', options: ['Lion', 'Leopard', 'Greyhound', 'Cheetah'], correctIdx: 3 },
-  { text: 'How many bones are in the adult human body?', options: ['186', '196', '206', '216'], correctIdx: 2 },
-  { text: 'Which language has the most native speakers worldwide?', options: ['English', 'Spanish', 'Hindi', 'Mandarin'], correctIdx: 3 },
-  { text: 'Which is the largest ocean on Earth?', options: ['Atlantic', 'Indian', 'Arctic', 'Pacific'], correctIdx: 3 },
-  { text: 'What does HTTP stand for?', options: ['HyperText Transfer Protocol', 'High Tech Text Protocol', 'Home Tool Transfer Process', 'Hybrid Transfer Technology'], correctIdx: 0 },
-  { text: 'How many players from one team are on the court in basketball?', options: ['4', '5', '6', '7'], correctIdx: 1 },
-  { text: 'What is the square root of 144?', options: ['10', '11', '12', '13'], correctIdx: 2 },
-  { text: 'Which country has the most natural lakes?', options: ['Russia', 'USA', 'China', 'Canada'], correctIdx: 3 },
-  { text: 'In what year was the first iPhone released?', options: ['2005', '2006', '2007', '2008'], correctIdx: 2 },
-  { text: 'Which planet is known as the Red Planet?', options: ['Venus', 'Mars', 'Jupiter', 'Mercury'], correctIdx: 1 },
-  { text: 'How many teeth does a typical adult human have?', options: ['28', '30', '32', '34'], correctIdx: 2 },
-  { text: 'What is the smallest country in the world by area?', options: ['Monaco', 'San Marino', 'Liechtenstein', 'Vatican City'], correctIdx: 3 },
-  { text: 'What is the hardest natural substance on Earth?', options: ['Granite', 'Steel', 'Diamond', 'Quartz'], correctIdx: 2 },
-  { text: 'Which organ produces insulin in the human body?', options: ['Liver', 'Kidney', 'Pancreas', 'Stomach'], correctIdx: 2 },
-  { text: 'How many continents are there on Earth?', options: ['5', '6', '7', '8'], correctIdx: 2 },
-  { text: 'What is the chemical formula for water?', options: ['CO2', 'H2O', 'NaCl', 'O2'], correctIdx: 1 },
-  { text: 'Who painted the Mona Lisa?', options: ['Michelangelo', 'Raphael', 'Leonardo da Vinci', 'Caravaggio'], correctIdx: 2 },
-];
+const QUESTIONS = require('./questions.json');
+// questions.json format: { text, category, answer, hint }
 
 function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return arr;
+  return a;
 }
 
-// Called once when room is created; sets Trivia-specific fields.
+// Called once when room is created (by game-router.js).
 function initRoom(room) {
   room.triviaQuestions = shuffle([...QUESTIONS]);
   room.triviaQuestion = null;
-  room.triviaAnswers = {};
+  room.buzzOrder = [];        // [{ playerIdx, timestamp }] in arrival order
+  room.currentBuzzer = null;  // playerIdx of player currently in judging seat
   room.lastDeltas = [];
-  room.turnQueue = [];
 }
 
 function startRound(room) {
-  // Fix totalRounds to a sensible trivia length on first start or play again.
-  if (room.round === 0) room.totalRounds = Math.min(10, QUESTIONS.length);
+  if (room.round === 0) room.totalRounds = Math.min(15, QUESTIONS.length);
   room.triviaQuestion = room.triviaQuestions[room.round % room.triviaQuestions.length];
-  room.triviaAnswers = {};
+  room.buzzOrder = [];
+  room.currentBuzzer = null;
   room.lastDeltas = room.players.map(() => 0);
-  // turnQueue drives the per-player timer via server.js's applyTimerPolicy.
-  // Each player answers in turn; when all have gone, revealScore fires.
-  room.turnQueue = room.players.map((p, i) => (p.connected ? i : null)).filter(i => i !== null);
-  room.phase = 'guess';
+  room.phase = 'question';
   room.lastActivity = Date.now();
 }
 
-function revealScore(room) {
+function revealScore(room, correctPlayerIdx) {
   room.phase = 'score';
-  room.turnQueue = [];
-  const correct = room.triviaQuestion.correctIdx;
-  room.lastDeltas = room.players.map((p, i) => {
-    const pts = room.triviaAnswers[i] === correct ? 1 : 0;
-    p.score += pts;
-    return pts;
-  });
+  room.lastDeltas = room.players.map(() => 0);
+  if (correctPlayerIdx !== null && correctPlayerIdx !== undefined) {
+    room.lastDeltas[correctPlayerIdx] = 1;
+    room.players[correctPlayerIdx].score += 1;
+  }
   room.lastActivity = Date.now();
 }
 
@@ -80,40 +51,68 @@ function nextRoundInternal(room) {
   room.lastActivity = Date.now();
 }
 
-// Unified entry point for all in-game player actions.
+// Unified entry point for all in-game player actions (and timer expiry).
 function processGuess(room, playerIdx, msg) {
   switch (msg.type) {
-    case 'PLACE_GUESS': {
-      if (room.phase !== 'guess') return { ok: false, error: 'Not in guess phase' };
-      if (room.turnQueue[0] !== playerIdx) return { ok: false, error: 'Not your turn' };
-      const ai = msg.answerIdx;
-      if (typeof ai !== 'number' || ai < 0 || ai > 3) return { ok: false, error: 'Invalid answer' };
-      room.triviaAnswers[playerIdx] = ai;
-      room.turnQueue.shift();
+
+    // Player hits buzz button during 'question' phase.
+    // Returns { ok, firstBuzz } so server.js can start the 3s buzz window timer.
+    case 'BUZZ': {
+      if (room.phase !== 'question') return { ok: false, silent: true };
+      const ts = msg.timestamp || Date.now();
+      const alreadyBuzzed = room.buzzOrder.some(b => b.playerIdx === playerIdx);
+      if (alreadyBuzzed) return { ok: false, silent: true };
+      const firstBuzz = room.buzzOrder.length === 0;
+      room.buzzOrder.push({ playerIdx, timestamp: ts });
+      if (firstBuzz) {
+        room.phase = 'buzzed';
+        room.currentBuzzer = null; // will be set when buzz window closes
+      }
       room.lastActivity = Date.now();
-      if (room.turnQueue.length === 0) revealScore(room);
+      return { ok: true, firstBuzz };
+    }
+
+    // Fired by server.js when the 3s buzz window timer expires.
+    // Promotes the first buzzer to judging seat.
+    case 'BUZZ_EXPIRED': {
+      if (room.phase !== 'buzzed') return { ok: false, silent: true };
+      // Sort by timestamp just in case out-of-order delivery happened
+      room.buzzOrder.sort((a, b) => a.timestamp - b.timestamp);
+      room.currentBuzzer = room.buzzOrder[0].playerIdx;
+      room.phase = 'judging';
+      room.lastActivity = Date.now();
       return { ok: true };
     }
+
+    // Host marks the current buzzer correct.
+    case 'MARK_CORRECT': {
+      if (room.phase !== 'judging') return { ok: false, error: 'Not in judging phase' };
+      if (playerIdx !== room.hostIdx) return { ok: false, error: 'Host only' };
+      revealScore(room, room.currentBuzzer);
+      return { ok: true };
+    }
+
+    // Host marks the current buzzer wrong — no points awarded.
+    case 'MARK_WRONG': {
+      if (room.phase !== 'judging') return { ok: false, error: 'Not in judging phase' };
+      if (playerIdx !== room.hostIdx) return { ok: false, error: 'Host only' };
+      revealScore(room, null);
+      return { ok: true };
+    }
+
+    // Round timer expired with no buzz — skip to score, no points.
     case 'TIMER_EXPIRE': {
-      if (room.phase !== 'guess') return { ok: false, silent: true };
-      // Current player timed out — skip them (no answer recorded = wrong).
-      if (room.turnQueue.length > 0) room.turnQueue.shift();
-      room.lastActivity = Date.now();
-      if (room.turnQueue.length === 0) revealScore(room);
+      if (room.phase !== 'question') return { ok: false, silent: true };
+      revealScore(room, null);
       return { ok: true };
     }
-    case 'SKIP_TURN': {
-      if (room.phase !== 'guess') return { ok: false, error: 'Not in guess phase' };
-      if (room.turnQueue.length > 0) room.turnQueue.shift();
-      room.lastActivity = Date.now();
-      if (room.turnQueue.length === 0) revealScore(room);
-      return { ok: true };
-    }
+
     case 'NEXT_ROUND': {
       if (room.phase !== 'score') return { ok: false, error: 'Not in score phase' };
       nextRoundInternal(room);
       return { ok: true };
     }
+
     case 'PLAY_AGAIN': {
       if (room.phase !== 'over') return { ok: false, error: 'Game is not over' };
       room.players.forEach(p => { p.score = 0; });
@@ -122,16 +121,20 @@ function processGuess(room, playerIdx, msg) {
       startRound(room);
       return { ok: true };
     }
+
+    case 'SKIP_TURN':
     case 'UNDO_LAST':
     case 'CLUE_READY':
+    case 'PLACE_GUESS':
       return { ok: false, silent: true };
+
     default:
       return { ok: false, error: `Unknown action: ${msg.type}` };
   }
 }
 
 function sanitizeForPlayer(room, playerIdx) {
-  const inGuess = room.phase === 'guess';
+  const isHost = playerIdx === room.hostIdx;
   return {
     code: room.code,
     gameType: room.gameType,
@@ -142,16 +145,14 @@ function sanitizeForPlayer(room, playerIdx) {
     phase: room.phase,
     triviaQuestion: room.triviaQuestion ? {
       text: room.triviaQuestion.text,
-      options: room.triviaQuestion.options,
-      // Hide the correct answer until the score phase.
-      correctIdx: inGuess ? null : room.triviaQuestion.correctIdx,
+      category: room.triviaQuestion.category,
+      hint: room.triviaQuestion.hint,
+      // Full answer only visible to host; shown to everyone in score phase.
+      answer: (isHost || room.phase === 'score') ? room.triviaQuestion.answer : null,
     } : null,
-    // During guess phase each player only sees their own submitted answer.
-    triviaAnswers: inGuess
-      ? (room.triviaAnswers[playerIdx] !== undefined ? { [playerIdx]: room.triviaAnswers[playerIdx] } : {})
-      : { ...room.triviaAnswers },
+    buzzOrder: room.buzzOrder,
+    currentBuzzer: room.currentBuzzer,
     lastDeltas: room.lastDeltas,
-    turnQueue: room.turnQueue,
     settings: room.settings,
     timerSeconds: room.timerSeconds || 0,
   };

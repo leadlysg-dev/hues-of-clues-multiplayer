@@ -248,23 +248,26 @@
   .trivia-q{background:var(--panel); border:4px solid var(--ink); box-shadow:5px 5px 0 var(--ink);
             padding:20px 24px; font-size:22px; font-weight:900; line-height:1.45; text-transform:none;
             letter-spacing:0; color:var(--text);}
-  .trivia-opts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  .trivia-opt{background:var(--panel2); border:4px solid var(--ink); box-shadow:4px 4px 0 var(--ink);
-              padding:16px 18px; font-size:16px; font-weight:900; text-transform:none; letter-spacing:0;
-              color:var(--text); text-align:left; cursor:pointer; line-height:1.4;}
-  .trivia-opt:not(.disabled):not(.correct):not(.wrong-chosen):hover{border-color:var(--accent); box-shadow:4px 4px 0 var(--accent);}
-  .trivia-opt.selected{border-color:var(--blue); box-shadow:4px 4px 0 var(--blue); background:var(--blue); color:var(--ink);}
-  .trivia-opt.correct{border-color:var(--green); box-shadow:4px 4px 0 var(--green); background:var(--green); color:var(--ink);}
-  .trivia-opt.wrong-chosen{border-color:var(--pink); box-shadow:4px 4px 0 var(--pink); background:var(--panel); color:var(--muted);}
-  .trivia-opt.disabled{cursor:default;}
-  .ta-players{display:inline-flex; gap:4px; margin-left:6px; vertical-align:middle;}
-  .ta-dot{display:inline-block; width:14px; height:14px; border:2px solid var(--ink); border-radius:0;}
+  .trivia-cat{font-size:12px; color:var(--pink); font-weight:900; letter-spacing:1px; margin-bottom:8px;}
+  .trivia-answer{background:var(--panel2); border:4px solid var(--green); box-shadow:4px 4px 0 var(--ink);
+                 padding:16px 18px; font-size:18px; font-weight:900; text-transform:none; letter-spacing:0;
+                 color:var(--green); text-align:center;}
+  .trivia-buzz-btn{background:var(--pink); color:var(--ink); border:5px solid var(--ink);
+                   box-shadow:6px 6px 0 var(--ink); font-size:28px; font-weight:900; padding:24px 40px;
+                   width:100%; letter-spacing:2px; animation:buzzPulse 1s steps(2) infinite alternate;}
+  @keyframes buzzPulse{to{box-shadow:6px 6px 0 var(--ink), 0 0 24px rgba(255,119,168,0.6);}}
+  .trivia-buzz-btn:disabled{opacity:.4; cursor:default; animation:none;}
+  .trivia-buzz-btn.buzzed{background:var(--accent); animation:none;}
+  .trivia-buzzer-reveal{background:var(--panel); border:4px solid var(--accent); box-shadow:5px 5px 0 var(--ink);
+                        padding:20px; text-align:center; font-size:20px; font-weight:900;}
+  .trivia-host-btns{display:flex; gap:12px; margin-top:4px;}
+  .trivia-host-btns button{flex:1; font-size:18px; padding:18px;}
+  .btn-correct{background:var(--green); color:var(--ink);}
+  .btn-wrong{background:var(--pink); color:var(--ink);}
   .trivia-wait{font-size:14px; color:var(--muted); text-align:center; text-transform:none; letter-spacing:0;}
-  .trivia-answered{font-size:14px; color:var(--blue); font-weight:900; text-align:center; text-transform:none; letter-spacing:0;}
   @media(max-width:768px){
-    .trivia-opts{grid-template-columns:1fr;}
     .trivia-q{font-size:16px; padding:14px 16px;}
-    .trivia-opt{font-size:14px; padding:12px 14px;}
+    .trivia-buzz-btn{font-size:20px; padding:18px;}
     #triviaArea{padding:10px;}
   }
 
@@ -855,7 +858,9 @@ function renderClueBar(){
 /* ====== TIMER ====== */
 function renderTimer(){
   const t=el('timer');
-  if(state.phase==='guess'&&state.settings.turnSeconds>0&&state.timerSeconds>0){
+  const showTimer=(state.phase==='guess'&&state.settings.turnSeconds>0&&state.timerSeconds>0)
+    ||(state.gameType==='trivia'&&(state.phase==='question'||state.phase==='buzzed')&&state.timerSeconds>0);
+  if(showTimer){
     t.textContent='⏱ '+state.timerSeconds;
     t.classList.toggle('low',state.timerSeconds<=5);
   } else {
@@ -913,21 +918,22 @@ function renderTriviaHeader(){
   const phaseEl=el('hPhase'), subEl=el('hSub'), right=el('hRight');
   right.innerHTML='';
 
-  if(phase==='guess'){
-    const curIdx=state.turnQueue[0];
-    const cur=state.players[curIdx];
-    const isMyTurn=curIdx===myIdx;
-    phaseEl.innerHTML=isMyTurn
-      ?`<span style="color:var(--accent)">Your turn to answer!</span>`
-      :`<span style="color:${cur.color}">${esc(cur.name)}</span> is answering…`;
-    const rest=state.turnQueue.slice(1);
-    subEl.innerHTML=rest.length?`Up next: ${rest.map(i=>esc(state.players[i].name)).join(', ')}`:'Last one!';
+  if(phase==='question'){
+    phaseEl.innerHTML=`<span style="color:var(--accent)">Buzz in!</span>`;
+    subEl.textContent='First to buzz and answer correctly wins the point.';
+  } else if(phase==='buzzed'){
+    phaseEl.innerHTML=`<span style="color:var(--pink)">Buzz window open…</span>`;
+    subEl.textContent='Others can still buzz in. 3-second window.';
+  } else if(phase==='judging'){
+    const b=state.currentBuzzer!==null?state.players[state.currentBuzzer]:null;
+    phaseEl.innerHTML=b?`<span style="color:${b.color}">${esc(b.name)}</span> is answering…`:`Judging…`;
+    subEl.textContent=myIdx===state.hostIdx?'Mark correct or wrong below.':'Waiting for host to judge.';
   } else if(phase==='score'){
     phaseEl.textContent='Results';
     const myDelta=state.lastDeltas?.[myIdx]||0;
     subEl.innerHTML=myDelta>0
-      ?`<b style="color:var(--green)">You got it! +${myDelta}</b>`
-      :`<b style="color:var(--muted)">Wrong this time.</b>`;
+      ?`<b style="color:var(--green)">You got it! +1</b>`
+      :`<b style="color:var(--muted)">No points this round.</b>`;
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next →','btn-accent',doNextRound);
   } else if(phase==='over'){
     const best=Math.max(...state.players.map(p=>p.score));
@@ -942,58 +948,76 @@ function renderTriviaHeader(){
 }
 
 /* ====== TRIVIA AREA ====== */
+let hasBuzzed=false; // reset on phase change
 function renderTriviaArea(){
   const ta=el('triviaArea');
   const q=state.triviaQuestion;
   if(!q){ta.innerHTML=''; return;}
 
   const phase=state.phase;
-  const isMyTurn=phase==='guess'&&state.turnQueue[0]===myIdx;
-  const myAnswer=state.triviaAnswers?.[myIdx];
-  const hasAnswered=myAnswer!==undefined;
-  const correctIdx=state.triviaQuestion.correctIdx; // null during guess phase
-  const LABELS=['A','B','C','D'];
+  const isHost=myIdx===state.hostIdx;
 
-  let html=`<div class="trivia-q">${esc(q.text)}</div><div class="trivia-opts">`;
-  q.options.forEach((opt,i)=>{
-    let cls='trivia-opt';
-    if(phase==='score'){
-      if(i===correctIdx) cls+=' correct';
-      else{
-        const anyPicked=state.triviaAnswers&&Object.values(state.triviaAnswers).some(a=>a===i);
-        if(anyPicked) cls+=' wrong-chosen';
-      }
+  // Reset buzz state on each question
+  if(phase==='question'&&ta.dataset.lastPhase!=='question'&&ta.dataset.lastPhase!=='buzzed'){
+    hasBuzzed=false;
+  }
+  ta.dataset.lastPhase=phase;
+
+  let html=`<div class="trivia-q">`;
+  if(q.category) html+=`<div class="trivia-cat">${esc(q.category)}</div>`;
+  html+=`${esc(q.text)}</div>`;
+
+  if(phase==='question'||phase==='buzzed'){
+    const myBuzz=state.buzzOrder&&state.buzzOrder.some(b=>b.playerIdx===myIdx);
+    const buzzCls='trivia-buzz-btn'+(myBuzz?' buzzed':'');
+    const dis=myBuzz||phase==='buzzed'&&!myBuzz?'disabled':'';
+    html+=`<button class="${buzzCls}" ${dis} onclick="doBuzz()">⚡ BUZZ IN!</button>`;
+    if(myBuzz) html+=`<div class="trivia-wait" style="color:var(--accent);font-weight:900;">Buzzed! Waiting for window to close…</div>`;
+    else if(phase==='buzzed') html+=`<div class="trivia-wait">Buzz window closed — waiting for host.</div>`;
+    // Host sees the answer at all times for judging
+    if(isHost&&q.answer) html+=`<div class="trivia-answer" style="border-color:var(--pink)">HOST ONLY — ANSWER: ${esc(q.answer)}</div>`;
+
+  } else if(phase==='judging'){
+    const b=state.currentBuzzer!==null?state.players[state.currentBuzzer]:null;
+    if(b){
+      html+=`<div class="trivia-buzzer-reveal">
+        <div style="font-size:14px;color:var(--muted);margin-bottom:8px;">BUZZER</div>
+        <div style="font-size:28px;color:${b.color};">${esc(b.name)}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px;text-transform:none;letter-spacing:0;">Answering out loud…</div>
+      </div>`;
+    }
+    if(isHost){
+      html+=`<div class="trivia-answer">ANSWER: ${esc(q.answer||'')}</div>`;
+      html+=`<div class="trivia-host-btns">
+        <button class="btn-correct" onclick="doMarkCorrect()">✓ Correct</button>
+        <button class="btn-wrong" onclick="doMarkWrong()">✗ Wrong</button>
+      </div>`;
+    }
+
+  } else if(phase==='score'){
+    const winner=state.lastDeltas&&state.lastDeltas.findIndex(d=>d>0);
+    if(winner>=0){
+      const wp=state.players[winner];
+      html+=`<div class="trivia-buzzer-reveal" style="border-color:var(--green);">
+        <div style="font-size:14px;color:var(--muted);margin-bottom:8px;">GOT IT</div>
+        <div style="font-size:28px;color:${wp.color};">${esc(wp.name)}</div>
+      </div>`;
     } else {
-      if(hasAnswered&&myAnswer===i) cls+=' selected';
-      if(!isMyTurn||hasAnswered) cls+=' disabled';
+      html+=`<div class="trivia-wait" style="padding:20px;">No one scored this round.</div>`;
     }
-
-    const whoAnswered=phase==='score'&&state.triviaAnswers
-      ?Object.entries(state.triviaAnswers).filter(([,a])=>a===i).map(([pi])=>state.players[parseInt(pi)]).filter(Boolean)
-      :[];
-    const dots=whoAnswered.map(p=>`<span class="ta-dot" style="background:${p.color}"></span>`).join('');
-    const onclick=(phase==='guess'&&isMyTurn&&!hasAnswered)?`onclick="doTriviaAnswer(${i})"`:'';
-    html+=`<button class="${cls}" ${onclick}>${LABELS[i]}. ${esc(opt)}${dots?`<span class="ta-players">${dots}</span>`:''}</button>`;
-  });
-  html+='</div>';
-
-  if(phase==='guess'){
-    if(!isMyTurn&&!hasAnswered){
-      const cur=state.players[state.turnQueue[0]];
-      html+=`<div class="trivia-wait">Waiting for <b style="color:${cur.color}">${esc(cur.name)}</b> to answer…</div>`;
-    } else if(hasAnswered&&!isMyTurn){
-      html+=`<div class="trivia-answered">✓ Answer locked in — waiting for others</div>`;
-    }
+    html+=`<div class="trivia-answer">ANSWER: ${esc(q.answer||'')}</div>`;
   }
 
   ta.innerHTML=html;
 }
 
-function doTriviaAnswer(idx){
-  if(!state||state.phase!=='guess'||state.turnQueue[0]!==myIdx) return;
-  if(state.triviaAnswers&&state.triviaAnswers[myIdx]!==undefined) return;
-  wsSend({type:'PLACE_GUESS',answerIdx:idx});
+function doBuzz(){
+  if(!state||state.phase!=='question'||hasBuzzed) return;
+  hasBuzzed=true;
+  wsSend({type:'BUZZ'});
 }
+function doMarkCorrect(){ wsSend({type:'MARK_CORRECT'}); }
+function doMarkWrong(){ wsSend({type:'MARK_WRONG'}); }
 
 /* ====== ACTIONS ====== */
 function doUndo(){wsSend({type:'UNDO_LAST'});}

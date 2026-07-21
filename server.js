@@ -75,13 +75,30 @@ function stopRoomTimer(room) {
   room.timerSeconds = 0;
 }
 
-// After any game action, apply this uniform timer policy:
-// guess phase with a pending guesser → restart turn timer; otherwise → stop it.
+// After any game action, apply the correct timer policy for the current game/phase.
 function applyTimerPolicy(room) {
   if (room.phase === 'guess' && room.turnQueue.length > 0) {
+    // Spectrum: per-player turn timer.
     startRoomTimer(room);
+  } else if (room.gameType === 'trivia' && room.phase === 'question') {
+    // Trivia: 90s round timer — start once per question (idempotent if already running).
+    if (!room._timers?.has('round')) {
+      const roundSeconds = 90;
+      room.timerSeconds = roundSeconds;
+      timer.startTimer(room, 'round', roundSeconds,
+        rem => { room.timerSeconds = rem; broadcastState(room); },
+        () => {
+          room.timerSeconds = 0;
+          game.processGuess(room, null, { type: 'TIMER_EXPIRE' });
+          broadcastState(room);
+        }
+      );
+    }
   } else {
+    // All other phases: stop all named timers.
     stopRoomTimer(room);
+    timer.stopTimer(room, 'round');
+    timer.stopTimer(room, 'buzz');
   }
 }
 
@@ -175,13 +192,34 @@ wss.on('connection', (ws) => {
       case 'SKIP_TURN':
       case 'UNDO_LAST':
       case 'NEXT_ROUND':
-      case 'PLAY_AGAIN': {
+      case 'PLAY_AGAIN':
+      case 'MARK_CORRECT':
+      case 'MARK_WRONG': {
         const result = game.processGuess(room, playerIdx, msg);
         if (result && !result.ok) {
           if (!result.silent) send(ws, { type: 'ERROR', message: result.error });
           break;
         }
         applyTimerPolicy(room);
+        broadcastState(room);
+        break;
+      }
+
+      // Trivia buzz: record arrival, start 3s buzz window on first buzz.
+      case 'BUZZ': {
+        msg.timestamp = Date.now();
+        const result = game.processGuess(room, playerIdx, msg);
+        if (result && !result.ok) {
+          if (!result.silent) send(ws, { type: 'ERROR', message: result.error });
+          break;
+        }
+        if (result && result.firstBuzz) {
+          // First buzz opens a 3s window for other players to also buzz in.
+          timer.startTimer(room, 'buzz', 3, null, () => {
+            game.processGuess(room, null, { type: 'BUZZ_EXPIRED' });
+            broadcastState(room);
+          });
+        }
         broadcastState(room);
         break;
       }
