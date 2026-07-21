@@ -224,6 +224,80 @@ async function testP4() {
   [host, p1].forEach(c => { try { c.ws.close(); } catch {} });
 }
 
+// Sets up a two-player room in the given gameType and starts the game.
+// Deliberately performs NO in-game action afterwards — the defect under test is
+// that the round timer only armed as a side effect of somebody acting.
+async function startedRoom(gameType) {
+  const host = client('Host');
+  await host.ready;
+  host.send({ type: 'CREATE_ROOM', name: 'Host', gameType });
+  await sleep(80);
+  const p1 = client('P1');
+  await p1.ready;
+  p1.send({ type: 'JOIN_ROOM', code: host.code, name: 'P1' });
+  await sleep(60);
+  host.send({ type: 'START_GAME' });
+  await sleep(150);
+  return { host, p1, close: () => [host, p1].forEach(c => { try { c.ws.close(); } catch {} }) };
+}
+
+// P5: pictionary 'drawing' must have a live round timer before the artist paints.
+// Pre-fix this sat at timerSeconds=0 indefinitely: the phase deliberately has no
+// PHASE_DEADLINE because it "already has a 90s round timer", and that timer never armed.
+async function testP5() {
+  const { host, close } = await startedRoom('pictionary');
+  if (host.state.phase !== 'drawing') {
+    close();
+    return check('P5', 'pictionary drawing arms its round timer with no player action',
+      false, `setup failed: expected phase 'drawing', got '${host.state.phase}'`);
+  }
+  const armed = host.state.timerSeconds;
+  await sleep(2200);
+  const later = host.state.timerSeconds;
+  check('P5', 'pictionary drawing arms its round timer with no player action',
+    armed > 0 && later > 0 && later < armed,
+    `timerSeconds armed=${armed}, after 2.2s=${later} (expected >0 and strictly decreasing)`);
+  close();
+}
+
+// P6: same defect through trivia's door — round one 'question' had no timer at all.
+async function testP6() {
+  const { host, close } = await startedRoom('trivia');
+  if (host.state.phase !== 'question') {
+    close();
+    return check('P6', 'trivia question arms its round timer in round one',
+      false, `setup failed: expected phase 'question', got '${host.state.phase}'`);
+  }
+  const armed = host.state.timerSeconds;
+  await sleep(2200);
+  const later = host.state.timerSeconds;
+  check('P6', 'trivia question arms its round timer in round one',
+    armed > 0 && later > 0 && later < armed,
+    `timerSeconds armed=${armed}, after 2.2s=${later} (expected >0 and strictly decreasing)`);
+  close();
+}
+
+// P7: guards the fix, not the defect. Arming a timer on START_GAME means BUZZ now
+// runs a timer-policy pass, and a blanket "stop everything" there would cancel the
+// 3s buzz window — leaving trivia stalled in 'buzzed', never reaching 'judging'.
+// This is the regression the obvious version of the fix introduces.
+async function testP7() {
+  const { host, p1, close } = await startedRoom('trivia');
+  if (host.state.phase !== 'question') {
+    close();
+    return check('P7', 'the 3s buzz window survives the timer-policy pass and reaches judging',
+      false, `setup failed: expected phase 'question', got '${host.state.phase}'`);
+  }
+  p1.send({ type: 'BUZZ' });
+  await sleep(150);
+  const afterBuzz = host.state.phase;
+  await sleep(3400); // buzz window is a real 3s
+  check('P7', 'the 3s buzz window survives the timer-policy pass and reaches judging',
+    afterBuzz === 'buzzed' && host.state.phase === 'judging',
+    `phase after buzz '${afterBuzz}', after window '${host.state.phase}' (expected 'buzzed' then 'judging')`);
+  close();
+}
+
 (async () => {
   PORT = await freePort();
   const srv = spawn(process.execPath, ['server.js'], {
@@ -249,6 +323,9 @@ async function testP4() {
     await testP2();
     await testP3();
     await testP4();
+    await testP5();
+    await testP6();
+    await testP7();
   } finally {
     srv.kill();
   }

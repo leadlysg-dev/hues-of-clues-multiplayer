@@ -205,7 +205,11 @@ function applyTimerPolicy(room) {
     // All other phases: stop all named timers.
     stopRoomTimer(room);
     timer.stopTimer(room, 'round');
-    timer.stopTimer(room, 'buzz');
+    // Exception, and it is load-bearing: 'buzzed' IS the 3s buzz window. That
+    // timer is armed by the BUZZ handler, not by this function, so a blanket
+    // stop here would cancel the window that is the whole point of the phase —
+    // BUZZ_EXPIRED would never fire and trivia would stall short of 'judging'.
+    if (room.phase !== 'buzzed') timer.stopTimer(room, 'buzz');
   }
   // Independent of the turn/round timers above: a phase can have both, or only this.
   applyPhaseDeadline(room);
@@ -291,6 +295,11 @@ wss.on('connection', (ws) => {
         room.totalRounds = room.players.length * 2;
         room.round = 0;
         game.startRound(room);
+        // Arm the round timer for the phase we just entered. Without this a
+        // trivia 'question' or pictionary 'drawing' has no timer at all until
+        // somebody happens to take an action, and a table where nobody acts
+        // hangs exactly the way a disconnect used to.
+        applyTimerPolicy(room);
         broadcastState(room);
         break;
       }
@@ -336,6 +345,10 @@ wss.on('connection', (ws) => {
             broadcastState(room);
           });
         }
+        // Buzzing leaves 'question', so the 90s round timer must stand down —
+        // otherwise it expires mid-judging and fires TIMER_EXPIRE at a phase
+        // that does not handle it. The buzz window itself is preserved above.
+        applyTimerPolicy(room);
         broadcastState(room);
         break;
       }
@@ -343,6 +356,10 @@ wss.on('connection', (ws) => {
       case 'END_GAME': {
         stopRoomTimer(room);
         room.phase = 'over';
+        // stopRoomTimer only clears the spectrum turn timer. Ending a game from
+        // 'drawing' or 'question' left 'round' (and 'buzz') ticking against a
+        // finished game until the 2h sweep — same leak class as the empty room.
+        timer.stopAllTimers(room);
         room.lastActivity = Date.now();
         broadcastState(room);
         break;
