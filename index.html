@@ -130,12 +130,14 @@
     backdrop-filter:blur(12px); padding:10px 16px; display:flex; align-items:center; gap:16px;
     box-shadow:var(--shadow);
   }
-  .h-left{flex:1; min-width:0;}
+  /* The phase heading is the one thing in the header a player has to read, so it
+     wins the space fight: h-mid/h-right shrink before it does. */
+  .h-left{flex:1 1 auto; min-width:0;}
   .h-round{font-size:11px; color:var(--muted); font-weight:600; letter-spacing:0.6px; text-transform:uppercase;}
   .h-phase{font-size:19px; font-weight:700; line-height:1.25; margin-top:3px; color:var(--text);}
   .h-sub{font-size:13px; color:var(--muted); margin-top:3px; line-height:1.4;}
   .h-sub b{color:var(--text); font-weight:600;}
-  .h-mid{display:flex; align-items:center; justify-content:center;}
+  .h-mid{display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
   .timer{
     font-size:42px; font-weight:800; line-height:1; min-width:110px; text-align:center;
     color:var(--green); font-variant-numeric:tabular-nums;
@@ -1469,7 +1471,10 @@ function renderDeadline(){
     // floor, not ceil: understating the time left makes a player hurry, overstating it
     // makes the phase end early on someone who trusted the number.
     const mins=Math.max(1,Math.floor(rem/60));
-    d.textContent=rem>=60?('⌛ ~'+mins+' min left'):('⌛ under a minute');
+    // Kept short deliberately: this is nowrap, and retro renders it uppercase with
+    // 2px letter-spacing. The long wording was wide enough to starve the phase
+    // heading beside it down to one word per line on a portrait viewport.
+    d.textContent=rem>=60?('⌛ ~'+mins+'m'):('⌛ <1m');
     d.title='Nobody is waiting on you forever — the phase advances on whoever has acted.';
   }
 }
