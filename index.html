@@ -528,7 +528,7 @@
 
 <script>
 const COLS=30, ROWS=16;
-const KNOWN_PHASES=new Set(['lobby','ready','guess','score','over','question','buzzed','judging']);
+const KNOWN_PHASES=new Set(['lobby','ready','guess','score','over','question','buzzed','judging','drawing','guessed','voting','reveal']);
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const coord=(r,c)=>String.fromCharCode(65+r)+(c+1);
 
