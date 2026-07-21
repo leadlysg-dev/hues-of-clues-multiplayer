@@ -180,8 +180,8 @@
     .chip .pts{font-size:15px;}
     .main{gap:0;}
     .panel{display:none;}
-    .board-area{align-items:stretch; justify-content:stretch;}
-    #board{min-width:0;}
+    .board-area{overflow:auto; -webkit-overflow-scrolling:touch; align-items:flex-start; justify-content:flex-start;}
+    #board{min-width:560px; min-height:280px;}
     #app.bar-open{padding-bottom:68px;}
     #peek{gap:12px; padding:20px 16px; overflow-y:auto; justify-content:flex-start; padding-top:36px;}
     #peek h2{font-size:22px;}
@@ -204,6 +204,19 @@
     .code-display{font-size:36px; letter-spacing:2px;}
     .h-right button{padding:7px 8px; font-size:11px;}
   }
+
+  /* ============ LANDSCAPE ROTATION HINT ============ */
+  #rotateHint{position:fixed; inset:0; z-index:150; background:var(--bg); display:none;
+    flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    gap:16px; padding:32px; pointer-events:all;
+    background-image:linear-gradient(rgba(0,0,0,.25) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.25) 1px,transparent 1px);
+    background-size:16px 16px;}
+  #rotateHint .rh-icon{font-size:56px; animation:rhSpin 2s ease-in-out infinite alternate;}
+  @keyframes rhSpin{from{transform:rotate(-15deg);}to{transform:rotate(15deg);}}
+  #rotateHint p{font-size:18px; color:var(--accent); font-weight:900; text-shadow:2px 2px 0 var(--ink),0 0 16px rgba(255,236,39,.5);}
+  #rotateHint small{font-size:13px; color:var(--muted); text-transform:none; letter-spacing:0;}
+  #rotateHint button{margin-top:8px; background:var(--panel2); color:var(--muted); border:3px solid var(--panel2); box-shadow:none; font-size:14px; padding:10px 24px;}
+  @media(max-width:768px) and (orientation:portrait){#rotateHint.game-active{display:flex;}}
 
   /* ============ HOW TO PLAY MODAL ============ */
   #howToPlay{position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;
@@ -239,6 +252,14 @@
 </style>
 </head>
 <body>
+
+<!-- ============ ROTATE HINT (portrait mobile, in-game only) ============ -->
+<div id="rotateHint">
+  <div class="rh-icon">📱</div>
+  <p>Rotate for the full board</p>
+  <small>The color grid is easier to see in landscape mode</small>
+  <button onclick="rotateDismissed=true;document.getElementById('rotateHint').classList.remove('game-active')">Play in portrait anyway →</button>
+</div>
 
 <!-- ============ HOW TO PLAY ============ -->
 <div id="howToPlay" style="display:none">
@@ -327,7 +348,7 @@
   <div class="lobby-card">
     <h2>Share this code to invite players</h2>
     <div class="code-display" id="lobbyCode">????</div>
-    <div class="lobby-hint">Friends open <b id="lobbyUrl"></b> and enter this code. Each player joins on their own device.</div>
+    <div class="lobby-hint">Share this link with everyone: <b id="lobbyUrl"></b></div>
     <div class="lobby-players" id="lobbyPlayers"></div>
     <button class="btn-green" id="lobbyStartBtn" onclick="doStart()" style="display:none">▶ Everyone's In — Start Game</button>
     <button class="btn-blue" onclick="doLeaveLobby()" style="margin-top:8px;width:100%;font-size:16px;padding:12px;">← Leave Room</button>
@@ -395,6 +416,7 @@ let ws=null, myIdx=null, myCode=null, myName=null;
 let state=null;
 let hoverRC=null, showingSecret=false, typeBuffer='', typeBad=false;
 let turnSeconds=30;
+let rotateDismissed=false;
 
 function el(id){return document.getElementById(id);}
 
@@ -447,6 +469,7 @@ function showErr(msg){
 /* ====== MESSAGES FROM SERVER ====== */
 function handleMsg(msg){
   if(msg.type==='ERROR'){
+    if(!state) try{localStorage.removeItem('hoc-session');}catch(e){}
     showErr(msg.message);
     return;
   }
@@ -454,11 +477,19 @@ function handleMsg(msg){
     myIdx=msg.yourIdx;
     myCode=msg.code;
     el('landingErr').textContent='';
+    try{localStorage.setItem('hoc-session',JSON.stringify({code:myCode,name:myName}));}catch(e){}
     return;
   }
   if(msg.type==='STATE'){
+    const prevMyTurn=state&&state.phase==='guess'&&state.turnQueue[0]===myIdx;
     state=msg.state;
     el('landingErr').textContent='';
+    const nowMyTurn=state.phase==='guess'&&state.turnQueue[0]===myIdx;
+    if(nowMyTurn&&!prevMyTurn){
+      document.title='🎯 YOUR TURN — Hues of Clues';
+      if(navigator.vibrate) navigator.vibrate([120,60,120]);
+      setTimeout(()=>{ document.title='Hues of Clues 🎨'; },4000);
+    }
     render();
     return;
   }
@@ -476,6 +507,9 @@ function render(){
   el('peek').style.display='none';
   el('app').style.display='none';
   updateMobileBar();
+  const rh=el('rotateHint');
+  if(rh){if(!rotateDismissed&&state.phase!=='lobby')rh.classList.add('game-active');
+  else rh.classList.remove('game-active');}
 
   if(phase==='lobby'){
     renderLobby();
@@ -493,6 +527,7 @@ function render(){
     } else {
       renderGameHeader();
       renderScores();
+      renderBoard();
       renderPanel();
     }
   } else {
@@ -508,7 +543,7 @@ function render(){
 /* ====== LOBBY ====== */
 function renderLobby(){
   el('lobbyCode').textContent=state.code;
-  el('lobbyUrl').textContent=location.host;
+  el('lobbyUrl').textContent=`${location.origin}${location.pathname}?join=${state.code}`;
   const pl=el('lobbyPlayers');
   pl.innerHTML='';
   state.players.forEach((p,i)=>{
@@ -566,6 +601,12 @@ function renderPeek(){
 
 function doClueReady(){
   const clue=(el('clueInput').value||'').trim();
+  if(!clue){
+    el('clueInput').style.borderColor='var(--pink)';
+    el('clueInput').placeholder='Say your clue out loud — type it here first!';
+    setTimeout(()=>{el('clueInput').style.borderColor='var(--accent)';},600);
+    return;
+  }
   wsSend({type:'CLUE_READY',clue});
 }
 
@@ -585,17 +626,20 @@ function renderGameHeader(){
     const cur=state.players[curIdx];
     const isMyTurn=curIdx===myIdx;
     phaseEl.innerHTML=`<span style="color:${cur.color}">${esc(cur.name)}</span>${isMyTurn?' — it\'s your turn to guess!':' is placing their guess…'}`;
+    const remaining=state.turnQueue.slice(1).map(i=>esc(state.players[i].name)).join(', ');
     subEl.innerHTML=isMyTurn
-      ? `Clue: <b>${esc(state.currentClue||'…')}</b> · Click a color tile, or type its grid code (e.g. <b>I13</b>) and press Enter`
-      : `Clue giver: <b>${esc(state.players[state.cueGiver].name)}</b> · Waiting for <b>${esc(cur.name)}</b> to guess`;
+      ? `Clue: <b>${esc(state.currentClue||'…')}</b> · Click a tile, or type its code (e.g. <b>I13</b>) and press Enter`
+      : `Clue: <b>${esc(state.currentClue||'…')}</b> · After ${esc(cur.name)}${remaining?` → ${remaining}`:''}`;
     if(myIdx===state.cueGiver||myIdx===state.hostIdx){
       addBtn(right,'↩ Undo','btn-ghost',doUndo,!state.guesses.length);
       addBtn(right,'⏭ Skip','btn-ghost',doSkip);
     }
   } else if(phase==='score'){
-    phaseEl.textContent='🎯 Reveal!';
+    phaseEl.textContent='🎯 Scores In!';
     const t=state.target;
-    subEl.innerHTML=t?`The secret color was <b>${coord(t.r,t.c)}</b> — ★ dead-on = 3 pts · solid box = 2 pts · dashed box = 1 pt · clue giver gets +1 per guess inside the box`:'';
+    const myDelta=state.lastDeltas[myIdx];
+    const myPts=myDelta>0?`<b style="color:var(--green)">You scored +${myDelta} this round!</b> · `:`<b style="color:var(--muted)">No points this round.</b> · `;
+    subEl.innerHTML=t?`${myPts}Secret was <b>${coord(t.r,t.c)}</b> — ★ dead-on 3pts · solid box 2pts · dashed 1pt`:'';
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next round →','btn-accent',doNextRound);
   } else if(phase==='over'){
     const best=Math.max(...state.players.map(p=>p.score));
@@ -747,7 +791,7 @@ function renderPanel(){
 function doUndo(){wsSend({type:'UNDO_LAST'});}
 function doSkip(){wsSend({type:'SKIP_TURN'});}
 function doNextRound(){wsSend({type:'NEXT_ROUND'});}
-function doEnd(){wsSend({type:'END_GAME'});}
+function doEnd(){if(!confirm('End the game for everyone?'))return; wsSend({type:'END_GAME'});}
 function doPlayAgain(){wsSend({type:'PLAY_AGAIN'});}
 
 /* ====== KEYBOARD ====== */
@@ -767,7 +811,7 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ====== MUSIC ====== */
-let audioCtx=null, masterGain=null, musicOn=true, musicTimer=null, beat=0;
+let audioCtx=null, masterGain=null, musicOn=false, musicTimer=null, beat=0;
 const PROG=[[130.81,[261.63,329.63,392.00]],[196.00,[293.66,392.00,493.88]],[220.00,[329.63,440.00,523.25]],[174.61,[349.23,440.00,523.25]]];
 const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33];
 function ensureAudio(){
@@ -851,6 +895,27 @@ function dismissHtp(){
 // Show on first ever visit
 (function(){
   try{if(!localStorage.getItem('htp-seen'))openHtp();}catch(e){}
+})();
+
+// Pre-fill join code from URL param (?join=CODE)
+(function(){
+  try{
+    const p=new URLSearchParams(location.search).get('join');
+    if(p){el('joinCode').value=p.toUpperCase().slice(0,4); el('joinName').focus();}
+  }catch(e){}
+})();
+
+// Try to reconnect from saved session (survives page reload)
+(function(){
+  try{
+    const s=JSON.parse(localStorage.getItem('hoc-session'));
+    const joinParam=new URLSearchParams(location.search).get('join');
+    if(s&&s.code&&s.name&&!joinParam){
+      myName=s.name;
+      el('landingErr').textContent='Reconnecting…';
+      connect(()=>wsSend({type:'RECONNECT',code:s.code,name:s.name}));
+    }
+  }catch(e){}
 })();
 
 // Boot into landing
