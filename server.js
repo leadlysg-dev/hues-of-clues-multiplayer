@@ -4,7 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
-const game = require('./game');
+const game = require('./game-router');
 const timer = require('./timer');
 
 const PORT = process.env.PORT || 3000;
@@ -75,12 +75,31 @@ function stopRoomTimer(room) {
   room.timerSeconds = 0;
 }
 
-// After any game action, apply the correct timer policy for the current phase.
+// After any game action, apply the correct timer policy for the current game/phase.
 function applyTimerPolicy(room) {
   if (room.phase === 'guess' && room.turnQueue.length > 0) {
+    // Spectrum: per-player turn timer.
     startRoomTimer(room);
+  } else if ((room.gameType === 'trivia' && room.phase === 'question') ||
+             (room.gameType === 'pictionary' && room.phase === 'drawing')) {
+    // Trivia question / Pictionary drawing: 90s round timer — start once per phase.
+    if (!room._timers?.has('round')) {
+      const roundSeconds = 90;
+      room.timerSeconds = roundSeconds;
+      timer.startTimer(room, 'round', roundSeconds,
+        rem => { room.timerSeconds = rem; broadcastState(room); },
+        () => {
+          room.timerSeconds = 0;
+          game.processGuess(room, null, { type: 'TIMER_EXPIRE' });
+          broadcastState(room);
+        }
+      );
+    }
   } else {
+    // All other phases: stop all named timers.
     stopRoomTimer(room);
+    timer.stopTimer(room, 'round');
+    timer.stopTimer(room, 'buzz');
   }
 }
 
@@ -94,9 +113,10 @@ wss.on('connection', (ws) => {
     if (type === 'CREATE_ROOM') {
       const name = (msg.name || '').trim().slice(0, 16);
       if (!name) return send(ws, { type: 'ERROR', message: 'Name required' });
+      const gameType = (msg.gameType || 'spectrum').toLowerCase();
       const code = genCode();
       let room;
-      try { room = game.createRoom(code, name, { turnSeconds: msg.turnSeconds }); }
+      try { room = game.createRoom(code, name, { turnSeconds: msg.turnSeconds }, gameType); }
       catch (e) { return send(ws, { type: 'ERROR', message: e.message }); }
       room.players[0].ws = ws;
       rooms.set(code, room);
@@ -173,13 +193,41 @@ wss.on('connection', (ws) => {
       case 'SKIP_TURN':
       case 'UNDO_LAST':
       case 'NEXT_ROUND':
-      case 'PLAY_AGAIN': {
+      case 'PLAY_AGAIN':
+      case 'MARK_CORRECT':
+      case 'MARK_WRONG':
+      case 'START_WRITING':
+      case 'SUBMIT_BLUFF':
+      case 'CAST_VOTE':
+      case 'PAINT_CELL':
+      case 'SUBMIT_GUESS':
+      case 'START_VOTE':
+      case 'SUBMIT_DIFFICULTY': {
         const result = game.processGuess(room, playerIdx, msg);
         if (result && !result.ok) {
           if (!result.silent) send(ws, { type: 'ERROR', message: result.error });
           break;
         }
         applyTimerPolicy(room);
+        broadcastState(room);
+        break;
+      }
+
+      // Trivia buzz: record arrival, start 3s buzz window on first buzz.
+      case 'BUZZ': {
+        msg.timestamp = Date.now();
+        const result = game.processGuess(room, playerIdx, msg);
+        if (result && !result.ok) {
+          if (!result.silent) send(ws, { type: 'ERROR', message: result.error });
+          break;
+        }
+        if (result && result.firstBuzz) {
+          // First buzz opens a 3s window for other players to also buzz in.
+          timer.startTimer(room, 'buzz', 3, null, () => {
+            game.processGuess(room, null, { type: 'BUZZ_EXPIRED' });
+            broadcastState(room);
+          });
+        }
         broadcastState(room);
         break;
       }
