@@ -4,6 +4,7 @@
 const MODULES = {
   spectrum: require('./game-spectrum'),
   trivia: require('./game-trivia'),
+  bluff: require('./game-bluff'),
   // pictionary: require('./game-pictionary'),
 };
 

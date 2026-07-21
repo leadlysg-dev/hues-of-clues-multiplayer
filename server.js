@@ -194,7 +194,10 @@ wss.on('connection', (ws) => {
       case 'NEXT_ROUND':
       case 'PLAY_AGAIN':
       case 'MARK_CORRECT':
-      case 'MARK_WRONG': {
+      case 'MARK_WRONG':
+      case 'START_WRITING':
+      case 'SUBMIT_BLUFF':
+      case 'CAST_VOTE': {
         const result = game.processGuess(room, playerIdx, msg);
         if (result && !result.ok) {
           if (!result.silent) send(ws, { type: 'ERROR', message: result.error });
