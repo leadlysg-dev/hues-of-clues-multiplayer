@@ -5,3 +5,9 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: node server.js
+    # Explicitly off. Render's Blueprint default is on, which would make the first
+    # push to origin/main a live release to real users rather than a push to a repo —
+    # deciding to share code and deciding to ship it are different decisions and
+    # should not be the same keystroke. Deploys are triggered manually until someone
+    # chooses otherwise, deliberately.
+    autoDeploy: false
