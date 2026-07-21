@@ -263,17 +263,32 @@ wss.on('connection', (ws) => {
     if (room.phase === 'guess' && room.turnQueue[0] === playerIdx) {
       stopRoomTimer(room);
       game.processGuess(room, playerIdx, { type: 'SKIP_TURN' });
-      applyTimerPolicy(room);
     }
 
-    // If host disconnected in lobby, promote next connected player
-    if (room.phase === 'lobby' && playerIdx === room.hostIdx) {
+    // D2: if the host disconnected, promote the next connected player — in ANY phase.
+    // Host-gated actions (MARK_CORRECT, START_WRITING, NEXT_ROUND) are unreachable while
+    // hostIdx points at a dead player, which bricks the round with no way out.
+    if (playerIdx === room.hostIdx) {
       const newHost = room.players.findIndex((pl, i) => i !== playerIdx && pl.connected);
       if (newHost !== -1) room.hostIdx = newHost;
     }
 
+    // D1: give the game module a chance to re-evaluate "everyone has submitted/voted"
+    // now that the roster shrank. Without this, a phase that waits on all connected
+    // players hangs forever — no further message can arrive to unstick it.
+    game.onPlayerLeft(room, playerIdx);
+
     const anyConnected = room.players.some(pl => pl.connected);
-    if (anyConnected) broadcastState(room);
+    // Nobody left in the room: kill every named timer rather than letting intervals
+    // tick against an empty room until the 2h expiry sweep. Render free tier is one
+    // long-lived process — leaked intervals accumulate across every abandoned room.
+    if (anyConnected) {
+      applyTimerPolicy(room);
+      broadcastState(room);
+    } else {
+      timer.stopAllTimers(room);
+      room.timerSeconds = 0;
+    }
   });
 });
 

@@ -50,7 +50,17 @@ function sanitizeForPlayer(room, playerIdx) {
   return getModule(room).sanitizeForPlayer(room, playerIdx);
 }
 
+// Called by server.js after a player disconnects, once the room's own bookkeeping
+// (connected flag, host promotion) is done. Optional per module: a game that has no
+// "waiting on everyone" phase simply doesn't export it and gets a no-op.
+// Modules must be idempotent here — it can fire for a player who already left.
+function onPlayerLeft(room, playerIdx) {
+  const mod = getModule(room);
+  if (typeof mod.onPlayerLeft !== 'function') return { ok: true, noop: true };
+  return mod.onPlayerLeft(room, playerIdx) || { ok: true };
+}
+
 module.exports = {
   PLAYER_COLORS,
-  createRoom, startRound, processGuess, sanitizeForPlayer,
+  createRoom, startRound, processGuess, sanitizeForPlayer, onPlayerLeft,
 };
