@@ -213,6 +213,120 @@ async function testD5() {
     `empty room held='${emptyHeld}' idempotent='${idempotent}' no-op in 'score'='${noopElsewhere}'`);
 }
 
+// D6–D9 cover the PHASE_DEADLINE case in the modules. P4 in test-platform.js proves the
+// server fires it; these prove the modules do the right thing when it lands. The design
+// rule under all four: expiry advances on whoever did act. It is never a forfeit.
+function bluffRoom(names) {
+  const router = require('./game-router');
+  const room = router.createRoom('TEST', names[0], 30, 'bluff');
+  names.slice(1).forEach(n => room.players.push({ name: n, score: 0, connected: true }));
+  router.startRound(room);
+  return room;
+}
+
+// D6: a player who ran out of time in 'voting' loses nothing, and the votes that did
+// land still score normally. The whole point of "advance on whoever acted".
+async function testD6() {
+  const bluff = require('./game-bluff');
+  const room = bluffRoom(['A', 'B', 'C']);
+  room.phase = 'writing';
+  bluff.processGuess(room, 0, { type: 'SUBMIT_BLUFF', text: 'a bluff' });
+  bluff.processGuess(room, 1, { type: 'SUBMIT_BLUFF', text: 'another bluff' });
+  bluff.processGuess(room, 2, { type: 'SUBMIT_BLUFF', text: 'a third bluff' });
+  const openedVoting = room.phase === 'voting';
+
+  // A votes for the real fact (worth 2). B and C never vote — their phones are asleep.
+  const realPos = room.shuffledOrder.indexOf(room.submissions.findIndex(s => s.isReal));
+  bluff.processGuess(room, 0, { type: 'CAST_VOTE', votedIdx: realPos });
+
+  bluff.processGuess(room, null, { type: 'PHASE_DEADLINE' });
+
+  const scored = room.phase === 'score';
+  const aRewarded = room.players[0].score === 2;
+  const noPenalty = room.players[1].score === 0 && room.players[2].score === 0;
+  check('D6', 'a voting deadline scores the votes that landed and penalises nobody',
+    openedVoting && scored && aRewarded && noPenalty,
+    `phase '${room.phase}'; scores ${room.players.map(p => p.score).join('/')} ` +
+    `(expected 2/0/0 — A identified the real fact, B and C timed out)`);
+}
+
+// D7: nobody bluffed before the deadline. Voting on the real fact alone is not a game —
+// one option, and picking it is free. Must score out instead of showing a one-item ballot.
+async function testD7() {
+  const bluff = require('./game-bluff');
+  const room = bluffRoom(['A', 'B']);
+  room.phase = 'writing';
+
+  bluff.processGuess(room, null, { type: 'PHASE_DEADLINE' });
+
+  const scored = room.phase === 'score';
+  const factStillShown = room.shuffledOrder.length === 1;
+  const noPhantomPoints = room.players.every(p => p.score === 0);
+  check('D7', 'a writing deadline with no bluffs scores out instead of a one-item ballot',
+    scored && factStillShown && noPhantomPoints,
+    `phase '${room.phase}'; ${room.shuffledOrder.length} item(s) in the reveal; ` +
+    `scores ${room.players.map(p => p.score).join('/')}`);
+}
+
+// D8: same rule as the artist drop — a correct guess already banked survives the
+// deadline. The guessers earned it; a missing difficulty rating is telemetry, not score.
+async function testD8() {
+  const pict = require('./game-pictionary');
+  const router = require('./game-router');
+  const room = router.createRoom('TEST', 'A', 30, 'pictionary');
+  room.players.push({ name: 'B', score: 0, connected: true });
+  router.startRound(room);
+
+  const guesser = room.artistIdx === 0 ? 1 : 0;
+  pict.processGuess(room, guesser, { type: 'SUBMIT_GUESS', text: room.secretWord });
+  const guessedPhase = room.phase === 'guessed';
+  pict.processGuess(room, room.hostIdx, { type: 'START_VOTE' });
+
+  pict.processGuess(room, null, { type: 'PHASE_DEADLINE' });
+
+  const scored = room.phase === 'score';
+  const banked = room.players[guesser].score === 2 && room.players[room.artistIdx].score === 1;
+  check('D8', 'a vote deadline keeps a correct guess that was already banked',
+    guessedPhase && scored && banked,
+    `phase '${room.phase}'; guesser ${room.players[guesser].score}pts, ` +
+    `artist ${room.players[room.artistIdx].score}pts (expected 2 and 1)`);
+}
+
+// D9: the same two guards D5 put on onPlayerLeft. A deadline can fire late, twice, or
+// into a room everyone has left — none of those may move a phase.
+//
+// Stated plainly because the count would otherwise flatter itself: D9 CANNOT go red
+// pre-fix. With no PHASE_DEADLINE case at all, the message falls to the default branch
+// and no phase moves — so "nothing moved" passes for the wrong reason. D6/D7/D8 are
+// load-bearing (verified red with the modules reverted); D9 is a regression guard on
+// top of them. Read 9/9 as eight tests and one guard, not nine tests.
+async function testD9() {
+  const bluff = require('./game-bluff');
+  const pict = require('./game-pictionary');
+
+  const room = bluffRoom(['A', 'B']);
+  room.phase = 'writing';
+  room.players.forEach(p => { p.connected = false; });
+  bluff.processGuess(room, null, { type: 'PHASE_DEADLINE' });
+  const emptyHeld = room.phase === 'writing';
+
+  room.players.forEach(p => { p.connected = true; });
+  room.phase = 'reveal';
+  bluff.processGuess(room, null, { type: 'PHASE_DEADLINE' });
+  const bluffNoop = room.phase === 'reveal';
+
+  const proom = require('./game-router').createRoom('TEST', 'A', 30, 'pictionary');
+  proom.players.push({ name: 'B', score: 0, connected: true });
+  require('./game-router').startRound(proom);
+  pict.processGuess(proom, null, { type: 'PHASE_DEADLINE' }); // phase is 'drawing'
+  const pictNoop = proom.phase === 'drawing';
+
+  check('D9', 'a deadline is a no-op in an empty room and in a phase it does not own',
+    emptyHeld && bluffNoop && pictNoop,
+    `empty room held='${emptyHeld}' bluff no-op in 'reveal'='${bluffNoop}' ` +
+    `pictionary no-op in 'drawing'='${pictNoop}'`);
+}
+
 // D2: host drops mid-game; a host-only action from the promoted host must succeed.
 async function testD2() {
   const { host, others } = await makeRoom('bluff', 3);
@@ -292,6 +406,10 @@ async function testD2() {
     await testD3();
     await testD4();
     await testD5();
+    await testD6();
+    await testD7();
+    await testD8();
+    await testD9();
   } finally {
     srv.kill();
   }

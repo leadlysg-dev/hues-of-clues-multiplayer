@@ -133,6 +133,17 @@ function processGuess(room, playerIdx, msg) {
       return { ok: true };
     }
 
+    // Deadline on 'vote'. Score out on the votes that did land — the difficulty rating
+    // is telemetry, not a scoring input, so a missing vote costs nobody anything. A
+    // correct guess already banked still scores, exactly as on an artist drop.
+    case 'PHASE_DEADLINE': {
+      if (room.phase !== 'vote') return { ok: true, silent: true };
+      if (room.players.filter(p => p.connected).length === 0) return { ok: true, silent: true };
+      const winner = room.guesses.find(g => g.correct);
+      revealScore(room, winner ? winner.playerIdx : null);
+      return { ok: true };
+    }
+
     case 'NEXT_ROUND': {
       if (room.phase !== 'score') return { ok: false, error: 'Not in score phase' };
       if (room.round + 1 >= room.totalRounds) {

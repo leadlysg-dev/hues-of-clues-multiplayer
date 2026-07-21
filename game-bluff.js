@@ -142,6 +142,27 @@ function processGuess(room, playerIdx, msg) {
       return { ok: true };
     }
 
+    // A phase deadline expired. Advance on whoever did act — this is not a forfeit.
+    // A player who ran out of time simply has no submission and no vote; nobody is
+    // punished for a slow phone. Same guards as onPlayerLeft: check the phase first,
+    // never throw, never broadcast (server.js owns that).
+    case 'PHASE_DEADLINE': {
+      if (connectedPlayers(room).length === 0) return { ok: true, silent: true };
+
+      if (room.phase === 'writing') {
+        // Nobody bluffed. Voting on the real fact alone is not a game — shuffle so the
+        // score screen can still reveal it, then score out with no votes cast.
+        beginVoting(room);
+        if (room.submissions.every(s => s.playerIdx === null)) revealScore(room);
+        return { ok: true };
+      }
+      if (room.phase === 'voting') {
+        revealScore(room); // scores whatever votes did land; unvoted players earn nothing
+        return { ok: true };
+      }
+      return { ok: true, silent: true };
+    }
+
     case 'NEXT_ROUND': {
       if (room.phase !== 'score') return { ok: false, error: 'Not in score phase' };
       if (room.round + 1 >= room.totalRounds) {

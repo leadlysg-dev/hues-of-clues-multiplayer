@@ -48,6 +48,8 @@
     border-radius:0 !important;
   }
   [data-theme="retro"] .timer{text-shadow:2px 2px 0 rgba(0,0,0,0.8); letter-spacing:4px;}
+  [data-theme="retro"] .deadline{letter-spacing:2px; text-transform:uppercase;}
+  [data-theme="retro"] .deadline.urgent{text-shadow:2px 2px 0 rgba(0,0,0,0.8); animation:urgentPulse 0.4s steps(2) infinite alternate;}
   [data-theme="retro"] .code-display{text-shadow:3px 3px 0 var(--accent); letter-spacing:16px; animation:blink 1s step-start infinite;}
   [data-theme="retro"] .chip.turn{animation:pixelBounce 0.4s steps(2) infinite; border:2px solid var(--accent) !important; box-shadow:0 0 0 1px var(--accent);}
   [data-theme="retro"] .cell.guessable:hover{outline:3px solid var(--accent) !important; outline-offset:-3px;}
@@ -139,6 +141,17 @@
   }
   .timer.low{color:var(--pink); animation:pulse .5s ease-in-out infinite alternate;}
   @keyframes pulse{to{opacity:0.55;}}
+  /* Phase deadline — deliberately NOT the same element or the same visual weight as
+     .timer. timerSeconds is the game clock you are playing against; this is only the
+     backstop that stops one idle player stalling everyone. Quiet until it matters. */
+  .deadline{
+    display:none; font-size:13px; font-weight:600; color:var(--muted);
+    font-variant-numeric:tabular-nums; text-align:center; white-space:nowrap;
+  }
+  .deadline.urgent{
+    font-size:22px; font-weight:800; color:var(--pink);
+    animation:pulse .5s ease-in-out infinite alternate;
+  }
   .h-right{display:flex; gap:8px; align-items:center;}
   .h-right button{padding:8px 14px; font-size:13px;}
   .btn-accent{background:var(--accent); color:#0f172a; border:none; font-weight:700;}
@@ -912,7 +925,7 @@
       <div class="h-phase" id="hPhase"></div>
       <div class="h-sub" id="hSub"></div>
     </div>
-    <div class="h-mid"><div class="timer" id="timer"></div></div>
+    <div class="h-mid"><div class="timer" id="timer"></div><div class="deadline" id="deadline"></div></div>
     <div class="h-right" id="hRight"><button class="btn-ghost" onclick="doLeaveGame()">🏠 Leave</button></div>
   </header>
   <div id="clueBar"></div>
@@ -1075,6 +1088,10 @@ function render(){
   }
 
   el('app').style.display='flex';
+  // Deliberately here, not inside renderTimer(): bluff never calls renderTimer, and
+  // bluff is precisely where the deadline lives. Hanging it off the timer would have
+  // shipped a countdown that never appears in the two phases that need it most.
+  renderDeadline();
 
   if(!KNOWN_PHASES.has(phase)){
     el('board').style.display='none';
@@ -1416,6 +1433,38 @@ function renderTimer(){
     t.classList.toggle('low',state.timerSeconds<=5);
   } else {
     t.textContent=''; t.classList.remove('low');
+  }
+}
+
+/* ====== PHASE DEADLINE ======
+   state.deadline is {phase,remaining,total} or null. Never inferred from anything
+   else and never merged with timerSeconds — the game clock and the anti-stall
+   backstop are different concepts and a player should never confuse the two.
+
+   Cadence matters here. The server broadcasts every second only under 15s; above
+   that it is every 15s, so a precise number would sit visibly frozen for fifteen
+   seconds and read as a bug. So: coarse wording while it is coarse, exact seconds
+   once it is exact. A screen that advances with no warning is a bug from where the
+   player sits, however correct the server is — this is the warning. */
+function renderDeadline(){
+  const d=el('deadline'); if(!d||!state) return;
+  const dl=state.deadline;
+  if(!dl||dl.phase!==state.phase||typeof dl.remaining!=='number'||dl.remaining<0){
+    d.style.display='none'; d.textContent=''; d.classList.remove('urgent');
+    return;
+  }
+  const rem=dl.remaining;
+  d.style.display='block';
+  d.classList.toggle('urgent',rem<=15);
+  if(rem<=15){
+    d.textContent='⌛ '+rem+'s';
+    d.title='This phase advances automatically when the time runs out.';
+  } else {
+    // floor, not ceil: understating the time left makes a player hurry, overstating it
+    // makes the phase end early on someone who trusted the number.
+    const mins=Math.max(1,Math.floor(rem/60));
+    d.textContent=rem>=60?('⌛ ~'+mins+' min left'):('⌛ under a minute');
+    d.title='Nobody is waiting on you forever — the phase advances on whoever has acted.';
   }
 }
 
