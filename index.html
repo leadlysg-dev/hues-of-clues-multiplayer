@@ -228,6 +228,15 @@
   .htp-score-item span{color:var(--muted); font-size:11px; text-transform:none; letter-spacing:0; font-weight:900;}
   .btn-htp{background:var(--green); color:var(--ink); font-size:20px; padding:18px; width:100%; margin-top:8px;}
   .htp-again{font-size:11px; color:var(--muted); text-align:center; margin-top:10px; text-transform:none; letter-spacing:0; cursor:pointer; text-decoration:underline;}
+
+  #htpScrollHint{display:none; position:sticky; bottom:0; left:0; right:0;
+                 text-align:center; padding:10px 0 4px; pointer-events:none;
+                 background:linear-gradient(transparent, var(--panel) 60%);
+                 font-size:28px; color:var(--accent);
+                 text-shadow:0 0 12px var(--accent), 0 0 28px rgba(255,236,39,0.6);
+                 animation:htpBounce 1s steps(2) infinite alternate;}
+  @keyframes htpBounce{from{transform:translateY(0); opacity:1;} to{transform:translateY(6px); opacity:0.4;}}
+  @media(max-width:768px){#htpScrollHint{display:block;}}
 </style>
 </head>
 <body>
@@ -273,6 +282,7 @@
 
     <button class="btn-htp" onclick="dismissHtp()">🎮 Got it — let's play!</button>
     <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
+    <div id="htpScrollHint">▼</div>
   </div>
 </div>
 
@@ -816,7 +826,17 @@ el('mobileTypeInput').addEventListener('input',e=>{
 });
 
 /* ====== HOW TO PLAY ====== */
-function openHtp(){el('howToPlay').style.display='flex';}
+function openHtp(){
+  el('howToPlay').style.display='flex';
+  const card=el('howToPlay').querySelector('.htp-card');
+  el('htpScrollHint').style.display='';
+  card.scrollTop=0;
+  card.onscroll=()=>{
+    const atBottom=card.scrollHeight-card.scrollTop-card.clientHeight<20;
+    el('htpScrollHint').style.opacity=atBottom?'0':'';
+    el('htpScrollHint').style.pointerEvents=atBottom?'none':'';
+  };
+}
 function dismissHtp(){
   el('howToPlay').style.display='none';
   try{localStorage.setItem('htp-seen','1');}catch(e){}
