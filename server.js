@@ -80,8 +80,9 @@ function applyTimerPolicy(room) {
   if (room.phase === 'guess' && room.turnQueue.length > 0) {
     // Spectrum: per-player turn timer.
     startRoomTimer(room);
-  } else if (room.gameType === 'trivia' && room.phase === 'question') {
-    // Trivia: 90s round timer — start once per question (idempotent if already running).
+  } else if ((room.gameType === 'trivia' && room.phase === 'question') ||
+             (room.gameType === 'pictionary' && room.phase === 'drawing')) {
+    // Trivia question / Pictionary drawing: 90s round timer — start once per phase.
     if (!room._timers?.has('round')) {
       const roundSeconds = 90;
       room.timerSeconds = roundSeconds;
@@ -197,7 +198,11 @@ wss.on('connection', (ws) => {
       case 'MARK_WRONG':
       case 'START_WRITING':
       case 'SUBMIT_BLUFF':
-      case 'CAST_VOTE': {
+      case 'CAST_VOTE':
+      case 'PAINT_CELL':
+      case 'SUBMIT_GUESS':
+      case 'START_VOTE':
+      case 'SUBMIT_DIFFICULTY': {
         const result = game.processGuess(room, playerIdx, msg);
         if (result && !result.ok) {
           if (!result.silent) send(ws, { type: 'ERROR', message: result.error });

@@ -5,7 +5,7 @@ const MODULES = {
   spectrum: require('./game-spectrum'),
   trivia: require('./game-trivia'),
   bluff: require('./game-bluff'),
-  // pictionary: require('./game-pictionary'),
+  pictionary: require('./game-pictionary'),
 };
 
 const PLAYER_COLORS = ['#e74c3c','#2f7bff','#27ae60','#9b59b6','#f39c12','#16c5c5','#ff5da2','#e6c92e'];

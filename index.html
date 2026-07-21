@@ -312,6 +312,31 @@
   .bluff-wait{font-size:14px; color:var(--muted); text-align:center; text-transform:none; letter-spacing:0;}
   .bluff-submitted-badge{background:var(--green); color:var(--ink); padding:4px 10px; font-size:13px; font-weight:900; display:inline-block; border:3px solid var(--ink); box-shadow:2px 2px 0 var(--ink);}
 
+  /* ============ PIXEL PICTIONARY ============ */
+  #pictArea{display:none; flex-direction:column; gap:10px; width:260px; flex-shrink:0;
+             padding:12px; overflow-y:auto;}
+  .pict-word{background:var(--accent); color:var(--ink); border:4px solid var(--ink);
+             box-shadow:4px 4px 0 var(--ink); padding:10px 16px; font-size:20px; font-weight:900; text-align:center;}
+  .pict-palette{display:flex; flex-wrap:wrap; gap:6px; padding:4px 0;}
+  .pict-color{width:36px; height:36px; border:3px solid var(--ink); box-shadow:3px 3px 0 var(--ink); cursor:pointer; flex-shrink:0;}
+  .pict-color.active{outline:4px solid var(--accent); outline-offset:-1px; box-shadow:3px 3px 0 var(--ink), 0 0 12px rgba(255,236,39,0.6);}
+  .pict-guess-input{background:var(--ink); border:4px solid var(--blue); color:var(--blue);
+                    padding:10px 12px; font-size:16px; font-weight:900; width:100%;
+                    text-transform:none; letter-spacing:0; user-select:text; font-family:inherit;}
+  .pict-guess-btn{background:var(--blue); color:var(--ink); font-size:15px; padding:10px; width:100%; margin-top:4px;}
+  .pict-chat{display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; padding:2px 0;}
+  .pict-msg{font-size:13px; text-transform:none; letter-spacing:0; padding:4px 6px;
+            border-left:3px solid var(--panel2); color:var(--muted); line-height:1.5;}
+  .pict-msg.correct{border-color:var(--green); color:var(--green); font-weight:900;}
+  .pict-diff-btns{display:flex; gap:6px; flex-direction:column;}
+  .pict-diff-btns button{font-size:14px; padding:10px;}
+  .btn-easy{background:var(--green); color:var(--ink);}
+  .btn-medium{background:var(--accent); color:var(--ink);}
+  .btn-hard{background:var(--pink); color:var(--ink);}
+  /* Pictionary board cell overrides */
+  .cell.painted{cursor:crosshair;}
+  .cell.pict-hover{outline:3px solid rgba(255,236,39,.7); outline-offset:-3px; z-index:8;}
+
   /* ============ GAME MODE TOGGLE ============ */
   .game-mode-toggle{display:flex; gap:8px; flex-wrap:wrap;}
   .gm-btn{flex:1; padding:10px; font-size:14px; background:var(--panel2); color:var(--muted);
@@ -686,11 +711,11 @@ function render(){
     el('board').style.display='';
     el('triviaArea').style.display='none';
     el('bluffArea').style.display='none';
-    el('pictArea').style.display='flex';
     el('clueBar').style.display='none';
     el('spectrumBar').classList.remove('visible');
     el('mobileBar').classList.remove('active');
     el('app').classList.remove('bar-open');
+    el('panel').style.display='flex';
     renderPictHeader();
     renderScores();
     renderPictBoard();
@@ -1251,6 +1276,188 @@ function doBuzz(){
 }
 function doMarkCorrect(){ wsSend({type:'MARK_CORRECT'}); }
 function doMarkWrong(){ wsSend({type:'MARK_WRONG'}); }
+
+/* ====== PIXEL PICTIONARY ====== */
+let pictColor=0; // index into paintColors array
+let pictBoardBuilt=false;
+
+function renderPictHeader(){
+  const phase=state.phase;
+  const artist=state.artistIdx!==undefined?state.players[state.artistIdx]:null;
+  const isArtist=myIdx===state.artistIdx;
+  el('hRound').textContent=phase==='over'?'Game over':`Round ${state.round+1} / ${state.totalRounds}`;
+  const phaseEl=el('hPhase'), subEl=el('hSub'), right=el('hRight');
+  right.innerHTML='';
+
+  if(phase==='drawing'||phase==='guessed'){
+    phaseEl.innerHTML=artist?`<span style="color:${artist.color}">${esc(artist.name)}</span>${isArtist?' — you\'re drawing!':' is drawing…'}`:'Drawing…';
+    if(isArtist) subEl.innerHTML=`Secret word: <b style="color:var(--accent)">${esc(state.secretWord||'')}</b>`;
+    else subEl.textContent=phase==='guessed'?'Someone guessed it! Artist can keep painting…':'Type your guess in the panel →';
+  } else if(phase==='timeout'){
+    phaseEl.textContent='⏰ Time\'s up!';
+    const w=state.secretWord;
+    subEl.innerHTML=w?`The word was <b style="color:var(--accent)">${esc(w)}</b>`:' ';
+    addBtn(right,'Vote →','btn-accent',()=>wsSend({type:'START_VOTE'}));
+  } else if(phase==='vote'){
+    phaseEl.textContent='🗳️ How hard was that?';
+    const done=state.difficultyVotes?.length||0;
+    subEl.textContent=`${done} / ${state.players.length} voted`;
+  } else if(phase==='score'){
+    phaseEl.textContent='✅ Round over!';
+    const myDelta=state.lastDeltas?.[myIdx]||0;
+    subEl.innerHTML=myDelta>0?`<b style="color:var(--green)">+${myDelta} this round!</b>`:
+      `<b style="color:var(--muted)">No points this round.</b>`;
+    addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next →','btn-accent',doNextRound);
+  } else if(phase==='over'){
+    const best=Math.max(...state.players.map(p=>p.score));
+    const winners=state.players.filter(p=>p.score===best).map(p=>p.name).join(' & ');
+    phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
+    subEl.textContent='Final scores above.';
+    addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
+  }
+  addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
+  if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
+}
+
+function renderPictBoard(){
+  if(!pictBoardBuilt){
+    buildBoard();
+    pictBoardBuilt=true;
+  }
+  // Clear everything
+  document.querySelectorAll('.marker').forEach(m=>m.remove());
+  document.querySelectorAll('.cell').forEach(x=>{
+    x.classList.remove('target','ring1','ring2','guessable');
+    x.style.background='';
+  });
+  // Restore base colours from cellHsl, then paint over with painted cells
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const cell=el(`cell-${r}-${c}`);
+    if(cell) cell.style.background=cellHsl(r,c).css;
+  }
+  for(const pc of (state.paintedCells||[])){
+    const cell=el(`cell-${pc.r}-${pc.c}`);
+    if(cell) cell.style.background=pc.color;
+  }
+  // Artist click-to-paint
+  const isArtist=myIdx===state.artistIdx;
+  const canPaint=isArtist&&(state.phase==='drawing'||state.phase==='guessed');
+  document.querySelectorAll('.cell').forEach(cell=>{
+    if(canPaint){
+      cell.style.cursor='crosshair';
+      cell.onclick=()=>{
+        const parts=cell.id.split('-');
+        const r=parseInt(parts[1]),c=parseInt(parts[2]);
+        const colors=state.paintColors||['#fff1e8','#ffec27','#ff004d','#ff77a8','#00e436','#29adff','#1d2b53','#000000'];
+        wsSend({type:'PAINT_CELL',r,c,color:colors[pictColor]});
+      };
+    } else {
+      cell.style.cursor='';
+      cell.onclick=null;
+    }
+  });
+}
+
+function renderPictArea(){
+  const pa=el('panel');
+  const phase=state.phase;
+  const isArtist=myIdx===state.artistIdx;
+  const colors=state.paintColors||['#fff1e8','#ffec27','#ff004d','#ff77a8','#00e436','#29adff','#1d2b53','#000000'];
+  let html='';
+
+  if(phase==='drawing'||phase==='guessed'){
+    if(isArtist){
+      // Palette picker
+      html+=`<div class="pict-word">${esc(state.secretWord||'')}</div>`;
+      html+=`<div class="pv-label" style="margin-top:4px;">PAINT COLOR</div><div class="pict-palette">`;
+      colors.forEach((col,i)=>{
+        html+=`<div class="pict-color${i===pictColor?' active':''}" style="background:${col}" onclick="setPictColor(${i})"></div>`;
+      });
+      html+=`</div>`;
+      html+=`<div class="pv-label" style="margin-top:8px;">CLICK BOARD TO PAINT</div>`;
+      if(phase==='guessed'){
+        html+=`<div style="color:var(--green);font-size:13px;font-weight:900;margin-top:8px;text-transform:none;letter-spacing:0;">Someone guessed correctly! You can keep painting.</div>`;
+        html+=`<button class="btn-accent" style="margin-top:8px;font-size:15px;padding:10px;width:100%;" onclick="wsSend({type:'START_VOTE'})">Move to vote →</button>`;
+      }
+    } else {
+      // Guess input + chat
+      const alreadyGuessed=state.guesses?.some(g=>g.playerIdx===myIdx&&g.correct);
+      if(!alreadyGuessed&&phase==='drawing'){
+        html+=`<div class="pv-label">YOUR GUESS</div>
+          <input class="pict-guess-input" id="pictGuessInput" type="text" maxlength="40" placeholder="Type and press Enter…" autocomplete="off" autocorrect="off" spellcheck="false" oninput="" onkeydown="if(event.key==='Enter')doPictGuess()">
+          <button class="pict-guess-btn" onclick="doPictGuess()">Guess →</button>`;
+      } else if(alreadyGuessed){
+        html+=`<div style="color:var(--green);font-weight:900;font-size:16px;padding:8px 0;text-transform:none;letter-spacing:0;">★ You got it!</div>`;
+      } else if(phase==='guessed'){
+        html+=`<div style="color:var(--accent);font-weight:900;font-size:14px;padding:8px 0;text-transform:none;letter-spacing:0;">Word guessed! Waiting for vote…</div>`;
+      }
+      // Guess chat
+      html+=`<div class="pv-label" style="margin-top:8px;">GUESSES</div><div class="pict-chat">`;
+      (state.guesses||[]).slice().reverse().forEach(g=>{
+        const p=state.players[g.playerIdx];
+        const isMine=g.playerIdx===myIdx;
+        html+=`<div class="pict-msg${g.correct?' correct':''}">
+          <span style="color:${p?.color||'#fff'};font-weight:900;">${esc(p?.name||'?')}</span>: ${esc(g.text)}
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+
+  } else if(phase==='timeout'){
+    html+=`<div class="pv-label">WORD WAS</div>
+      <div class="pict-word">${esc(state.secretWord||'')}</div>
+      <div style="color:var(--muted);font-size:13px;text-transform:none;letter-spacing:0;margin-top:8px;">Nobody guessed in time.</div>`;
+
+  } else if(phase==='vote'){
+    html+=`<div class="pv-label">HOW HARD WAS THAT?</div>
+      <div class="pict-diff-btns">`;
+    if(!state.myDifficultyVoted){
+      html+=`<button class="btn-easy" onclick="doVoteDiff('easy')">😄 Easy</button>
+             <button class="btn-medium" onclick="doVoteDiff('medium')">😐 Medium</button>
+             <button class="btn-hard" onclick="doVoteDiff('hard')">😤 Hard</button>`;
+    } else {
+      html+=`<div style="color:var(--blue);font-weight:900;font-size:14px;text-transform:none;letter-spacing:0;">Vote cast — waiting for others…</div>`;
+    }
+    html+=`</div>`;
+    // Tally so far
+    const tally={easy:0,medium:0,hard:0};
+    (state.difficultyVotes||[]).forEach(v=>{if(tally[v.vote]!==undefined)tally[v.vote]++;});
+    html+=`<div style="font-size:12px;color:var(--muted);margin-top:8px;text-transform:none;letter-spacing:0;">
+      😄 ${tally.easy} · 😐 ${tally.medium} · 😤 ${tally.hard}
+    </div>`;
+    if(isArtist) html+=`<div class="pv-label" style="margin-top:12px;">WORD WAS</div><div class="pict-word">${esc(state.secretWord||'')}</div>`;
+
+  } else if(phase==='score'){
+    const winner=state.guesses?.find(g=>g.correct);
+    const wp=winner?state.players[winner.playerIdx]:null;
+    html+=`<div class="pv-label">WORD WAS</div><div class="pict-word">${esc(state.secretWord||'')}</div>`;
+    if(wp) html+=`<div style="color:${wp.color};font-size:15px;font-weight:900;text-transform:none;letter-spacing:0;margin-top:8px;">★ ${esc(wp.name)} guessed it!</div>`;
+    else html+=`<div style="color:var(--muted);font-size:13px;text-transform:none;letter-spacing:0;margin-top:8px;">Nobody guessed.</div>`;
+    // Difficulty tally
+    const tally={easy:0,medium:0,hard:0};
+    (state.difficultyVotes||[]).forEach(v=>{if(tally[v.vote]!==undefined)tally[v.vote]++;});
+    html+=`<div style="font-size:12px;color:var(--muted);margin-top:8px;text-transform:none;letter-spacing:0;">Difficulty: 😄 ${tally.easy} · 😐 ${tally.medium} · 😤 ${tally.hard}</div>`;
+  }
+
+  pa.innerHTML=html;
+  // Restore focus on guess input
+  if((phase==='drawing')&&!isArtist){
+    const gi=el('pictGuessInput');
+    if(gi) gi.focus();
+  }
+}
+
+function setPictColor(i){ pictColor=i; renderPictArea(); }
+
+function doPictGuess(){
+  const inp=el('pictGuessInput');
+  const text=(inp?.value||'').trim();
+  if(!text) return;
+  wsSend({type:'SUBMIT_GUESS',text});
+  if(inp) inp.value='';
+}
+
+function doVoteDiff(vote){ wsSend({type:'SUBMIT_DIFFICULTY',vote}); }
 
 /* ====== ACTIONS ====== */
 function doUndo(){wsSend({type:'UNDO_LAST'});}
