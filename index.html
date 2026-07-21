@@ -230,11 +230,11 @@
   .htp-again{font-size:11px; color:var(--muted); text-align:center; margin-top:10px; text-transform:none; letter-spacing:0; cursor:pointer; text-decoration:underline;}
 
   #htpScrollHint{display:none; position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
-                 pointer-events:none; z-index:110; width:52px; height:52px;}
-  #htpScrollHint svg{width:52px; height:52px;
-                     filter:drop-shadow(0 0 8px var(--accent)) drop-shadow(0 0 18px rgba(255,236,39,0.5));
-                     animation:htpBounce .8s ease-in-out infinite alternate;}
-  @keyframes htpBounce{from{transform:translateY(0);} to{transform:translateY(8px);}}
+                 pointer-events:none; z-index:110;
+                 font-size:28px; color:var(--accent);
+                 text-shadow:0 0 12px var(--accent), 0 0 28px rgba(255,236,39,0.6);
+                 animation:htpBounce .8s ease-in-out infinite alternate;}
+  @keyframes htpBounce{from{transform:translateX(-50%) translateY(0);} to{transform:translateX(-50%) translateY(8px);}}
   @media(max-width:768px){#htpScrollHint{display:block;}}
 </style>
 </head>
@@ -283,12 +283,7 @@
     <div class="htp-again" onclick="dismissHtp()">Don't show this again</div>
   </div>
 </div>
-<div id="htpScrollHint">
-  <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="26" cy="26" r="23" stroke="#ffec27" stroke-width="3"/>
-    <polyline points="16,22 26,33 36,22" stroke="#ffec27" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-</div>
+<div id="htpScrollHint">▼</div>
 
 <!-- ============ LANDING ============ -->
 <div id="landing">
