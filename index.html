@@ -330,6 +330,7 @@
     <div class="lobby-hint">Friends open <b id="lobbyUrl"></b> and enter this code. Each player joins on their own device.</div>
     <div class="lobby-players" id="lobbyPlayers"></div>
     <button class="btn-green" id="lobbyStartBtn" onclick="doStart()" style="display:none">▶ Everyone's In — Start Game</button>
+    <button class="btn-blue" onclick="doLeaveLobby()" style="margin-top:8px;width:100%;font-size:16px;padding:12px;">← Leave Room</button>
     <div class="err-msg" id="lobbyErr"></div>
   </div>
 </div>
@@ -532,6 +533,13 @@ function renderLobby(){
 
 function doStart(){
   wsSend({type:'START_GAME'});
+}
+function doLeaveLobby(){
+  if(ws){ ws.onclose=null; ws.close(); ws=null; }
+  myIdx=null; myCode=null; myName=null; state=null;
+  el('lobby').style.display='none';
+  el('landing').style.display='flex';
+  el('lobbyErr').textContent='';
 }
 
 /* ====== PEEK OVERLAY ====== */
