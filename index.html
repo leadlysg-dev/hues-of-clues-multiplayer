@@ -268,6 +268,15 @@
     #triviaArea{padding:10px;}
   }
 
+  /* ============ SPECTRUM BAR ============ */
+  #spectrumBar{display:none; background:linear-gradient(to right,#7B4FFF,#2f7bff,#00e436,#ffec27,#ff7700,#ff004d);
+               border:4px solid var(--ink); box-shadow:5px 5px 0 var(--ink);
+               padding:8px 16px; align-items:center; justify-content:space-between; gap:8px;
+               font-size:15px; font-weight:900; color:var(--ink); user-select:none;}
+  #spectrumBar.visible{display:flex;}
+  #spectrumBar .sp-label{background:rgba(0,0,0,.35); color:#fff; padding:3px 8px; font-size:13px; max-width:42%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #spectrumBar .sp-arrow{font-size:20px; color:rgba(0,0,0,.5);}
+
   /* ============ GAME MODE TOGGLE ============ */
   .game-mode-toggle{display:flex; gap:8px;}
   .gm-btn{flex:1; padding:12px; font-size:15px; background:var(--panel2); color:var(--muted);
@@ -426,6 +435,7 @@
     <div class="h-right" id="hRight"></div>
   </header>
   <div id="clueBar"></div>
+  <div id="spectrumBar"><span class="sp-label" id="spLeft"></span><span class="sp-arrow">←→</span><span class="sp-label" id="spRight"></span></div>
   <div id="scores"></div>
   <div class="main">
     <div class="board-area">
@@ -573,6 +583,7 @@ function render(){
     el('board').style.display='none';
     el('triviaArea').style.display='flex';
     el('clueBar').style.display='none';
+    el('spectrumBar').classList.remove('visible');
     el('panel').style.display='none';
     el('mobileBar').classList.remove('active');
     el('app').classList.remove('bar-open');
@@ -586,6 +597,13 @@ function render(){
   // Spectrum
   el('board').style.display='';
   el('triviaArea').style.display='none';
+  if(state.spectrumLeft||state.spectrumRight){
+    el('spLeft').textContent=state.spectrumLeft||'';
+    el('spRight').textContent=state.spectrumRight||'';
+    el('spectrumBar').classList.add('visible');
+  } else {
+    el('spectrumBar').classList.remove('visible');
+  }
 
   if(phase==='ready'){
     if(myIdx===state.cueGiver){
@@ -648,22 +666,44 @@ function doLeaveLobby(){
 function renderPeek(){
   const p=state.players[state.cueGiver];
   el('peekTitle').textContent=`🎤 ${p.name} — you're the cue giver`;
-  el('peekMsg').innerHTML=`This screen is yours alone — no one else can see it. Hold the button to reveal your secret color, then give your clue out loud on your call.<br><br>Everyone else is waiting on their own screen. When you've said your clue and they're ready, tap <b>start guessing</b> to open the board.`;
   const sw=el('peekSwatch');
-  if(state.target){
-    const {css}=cellHsl(state.target.r,state.target.c);
-    sw.style.background=css; sw.style.visibility='hidden';
-    sw.textContent=coord(state.target.r,state.target.c);
-  }
-  const ci=el('clueInput'); ci.value='';
   const hold=el('peekHold');
-  const show=()=>{
-    sw.style.visibility='visible';
-    if(state.target){const {css}=cellHsl(state.target.r,state.target.c); sw.style.boxShadow=`8px 8px 0 var(--ink), 0 0 32px ${css}, 0 0 64px ${css}`;}
-  };
-  const hide=()=>{sw.style.visibility='hidden'; sw.style.boxShadow='8px 8px 0 var(--ink)';};
-  hold.onmousedown=show; hold.onmouseup=hide; hold.onmouseleave=hide;
-  hold.ontouchstart=e=>{e.preventDefault();show();}; hold.ontouchend=hide;
+  const ci=el('clueInput'); ci.value='';
+
+  if(state.gameType==='spectrum'){
+    el('peekMsg').innerHTML=`This screen is yours alone. Your secret word is shown below — place it on the spectrum, then give your clue out loud so others can guess where on the spectrum it falls.<br><br>When you've said your clue, tap <b>open the board</b>.`;
+    hold.textContent='🎯 Hold to reveal your secret position';
+    sw.style.visibility='hidden';
+    // Build spectrum bar with target marked
+    const tc=state.target?state.target.c:0;
+    const pct=((tc+0.5)/COLS*100).toFixed(1);
+    sw.innerHTML=`<div style="position:relative;width:100%;height:100%;background:linear-gradient(to right,#7B4FFF,#2f7bff,#00e436,#ffec27,#ff7700,#ff004d);border:3px solid var(--ink);">
+      <div style="position:absolute;top:0;bottom:0;left:${pct}%;width:4px;background:var(--ink);transform:translateX(-50%);"></div>
+      <div style="position:absolute;bottom:6px;left:${pct}%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:2px 6px;font-size:13px;font-weight:900;white-space:nowrap;">${(tc+1)}</div>
+      <div style="position:absolute;top:6px;left:4px;font-size:13px;font-weight:900;color:var(--ink);">${esc(state.spectrumLeft||'')}</div>
+      <div style="position:absolute;top:6px;right:4px;font-size:13px;font-weight:900;color:var(--ink);">${esc(state.spectrumRight||'')}</div>
+    </div>
+    <div style="font-size:28px;font-weight:900;margin-top:8px;color:var(--accent);text-shadow:2px 2px 0 var(--ink);">SECRET: ${esc(state.secretWord||'')}</div>`;
+    const show=()=>{sw.style.visibility='visible';};
+    const hide=()=>{sw.style.visibility='hidden';};
+    hold.onmousedown=show; hold.onmouseup=hide; hold.onmouseleave=hide;
+    hold.ontouchstart=e=>{e.preventDefault();show();}; hold.ontouchend=hide;
+  } else {
+    el('peekMsg').innerHTML=`This screen is yours alone — no one else can see it. Hold the button to reveal your secret color, then give your clue out loud on your call.<br><br>Everyone else is waiting on their own screen. When you've said your clue and they're ready, tap <b>start guessing</b> to open the board.`;
+    hold.textContent='🎨 Hold to reveal my secret color';
+    if(state.target&&state.target.r!==undefined){
+      const {css}=cellHsl(state.target.r,state.target.c);
+      sw.style.background=css; sw.style.visibility='hidden';
+      sw.textContent=coord(state.target.r,state.target.c);
+    }
+    const show=()=>{
+      sw.style.visibility='visible';
+      if(state.target&&state.target.r!==undefined){const {css}=cellHsl(state.target.r,state.target.c); sw.style.boxShadow=`8px 8px 0 var(--ink), 0 0 32px ${css}, 0 0 64px ${css}`;}
+    };
+    const hide=()=>{sw.style.visibility='hidden'; sw.style.boxShadow='8px 8px 0 var(--ink)';};
+    hold.onmousedown=show; hold.onmouseup=hide; hold.onmouseleave=hide;
+    hold.ontouchstart=e=>{e.preventDefault();show();}; hold.ontouchend=hide;
+  }
 }
 
 function doClueReady(){
@@ -706,7 +746,12 @@ function renderGameHeader(){
     const t=state.target;
     const myDelta=state.lastDeltas[myIdx];
     const myPts=myDelta>0?`<b style="color:var(--green)">You scored +${myDelta} this round!</b> · `:`<b style="color:var(--muted)">No points this round.</b> · `;
-    subEl.innerHTML=t?`${myPts}Secret was <b>${coord(t.r,t.c)}</b> — ★ dead-on 3pts · solid box 2pts · dashed 1pt`:'';
+    if(state.gameType==='spectrum'){
+      const pos=t?`column ${t.c+1} (${esc(state.secretWord||'')})`:'?';
+      subEl.innerHTML=t?`${myPts}Secret was <b>${pos}</b> · ★ exact col 3pts · ±1 col 2pts · ±2 col 1pt`:'';
+    } else {
+      subEl.innerHTML=t&&t.r!==undefined?`${myPts}Secret was <b>${coord(t.r,t.c)}</b> — ★ dead-on 3pts · solid box 2pts · dashed 1pt`:'';
+    }
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next round →','btn-accent',doNextRound);
   } else if(phase==='over'){
     const best=Math.max(...state.players.map(p=>p.score));
@@ -768,11 +813,18 @@ function renderBoard(){
   if(phase==='score'||phase==='over'){
     const t=state.target;
     if(t){
-      el(`cell-${t.r}-${t.c}`)?.classList.add('target');
-      for(let dr=-2;dr<=2;dr++) for(let dc=-2;dc<=2;dc++){
-        const rr=t.r+dr,cc=t.c+dc;
-        if(rr<0||rr>=ROWS||cc<0||cc>=COLS) continue;
-        el(`cell-${rr}-${cc}`)?.classList.add(Math.abs(dr)<=1&&Math.abs(dc)<=1?'ring2':'ring1');
+      if(state.gameType==='spectrum'){
+        // Column-only scoring: mark entire target column and ±1/±2 columns
+        for(let r=0;r<ROWS;r++) el(`cell-${r}-${t.c}`)?.classList.add('target');
+        for(const dc of[-1,1]) for(let r=0;r<ROWS;r++) el(`cell-${r}-${t.c+dc}`)?.classList.add('ring2');
+        for(const dc of[-2,2]) for(let r=0;r<ROWS;r++) el(`cell-${r}-${t.c+dc}`)?.classList.add('ring1');
+      } else {
+        el(`cell-${t.r}-${t.c}`)?.classList.add('target');
+        for(let dr=-2;dr<=2;dr++) for(let dc=-2;dc<=2;dc++){
+          const rr=t.r+dr,cc=t.c+dc;
+          if(rr<0||rr>=ROWS||cc<0||cc>=COLS) continue;
+          el(`cell-${rr}-${cc}`)?.classList.add(Math.abs(dr)<=1&&Math.abs(dc)<=1?'ring2':'ring1');
+        }
       }
     }
   }
@@ -815,10 +867,10 @@ function renderTimer(){
 function renderPanel(){
   const p=el('panel'); if(!p) return;
   let previewCss='var(--panel2)', previewText='—', label='HOVER A TILE';
-  if(showingSecret&&state&&state.target){
+  if(showingSecret&&state&&state.target&&state.target.r!==undefined){
     const {css}=cellHsl(state.target.r,state.target.c);
     previewCss=css; previewText=coord(state.target.r,state.target.c); label='🔒 YOUR SECRET COLOR';
-  } else if(hoverRC){
+  } else if(hoverRC&&state&&state.gameType!=='spectrum'){
     const {css}=cellHsl(hoverRC.r,hoverRC.c);
     previewCss=css; previewText=coord(hoverRC.r,hoverRC.c); label='HOVERING';
   }
@@ -837,7 +889,7 @@ function renderPanel(){
         <div class="type-hint">Type a grid code like I13 then press Enter — or just click the tile</div></div>
       </div>`;
     }
-    if(isCueGiver){
+    if(isCueGiver&&state.gameType!=='spectrum'){
       html+=`<button class="hold-see ${showingSecret?'active':''}" id="holdSeeBtn">🎨 Hold to peek at your secret color</button>`;
     }
   }
