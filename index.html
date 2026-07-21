@@ -660,7 +660,7 @@
       <div class="h-sub" id="hSub"></div>
     </div>
     <div class="h-mid"><div class="timer" id="timer"></div></div>
-    <div class="h-right" id="hRight"></div>
+    <div class="h-right" id="hRight"><button class="btn-ghost" onclick="doLeaveGame()">🏠 Leave</button></div>
   </header>
   <div id="clueBar"></div>
   <div id="spectrumBar"><span class="sp-label" id="spLeft"></span><span class="sp-arrow">←→</span><span class="sp-label" id="spRight"></span></div>
@@ -949,6 +949,12 @@ function doLeaveLobby(){
   el('lobby').style.display='none';
   el('landing').style.display='flex';
   el('lobbyErr').textContent='';
+}
+function doLeaveGame(){
+  if(ws){ ws.onclose=null; ws.close(); ws=null; }
+  myIdx=null; myCode=null; myName=null; state=null;
+  el('app').style.display='none';
+  el('landing').style.display='flex';
 }
 
 /* ====== PEEK OVERLAY ====== */
