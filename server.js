@@ -23,11 +23,36 @@ function genCode() {
   return code;
 }
 
-const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'));
+// index.html is re-read whenever its mtime changes rather than snapshotted at boot.
+// Client and server now land in separate commits, so a boot-time snapshot means a
+// long-lived process serves a stale client — version skew that presents as a game bug.
+const INDEX_PATH = path.join(__dirname, 'index.html');
+let indexCache = { mtimeMs: 0, body: null, etag: null };
+function getIndex() {
+  const { mtimeMs, size } = fs.statSync(INDEX_PATH);
+  if (mtimeMs !== indexCache.mtimeMs) {
+    indexCache = {
+      mtimeMs,
+      body: fs.readFileSync(INDEX_PATH),
+      etag: `W/"${size.toString(16)}-${Math.round(mtimeMs).toString(16)}"`,
+    };
+  }
+  return indexCache;
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(indexHtml);
+    const idx = getIndex();
+    if (req.headers['if-none-match'] === idx.etag) {
+      res.writeHead(304, { ETag: idx.etag });
+      return res.end();
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'ETag': idx.etag,
+      'Cache-Control': 'no-cache', // revalidate every load; 304s stay cheap
+    });
+    res.end(idx.body);
   } else {
     res.writeHead(404);
     res.end('Not found');
@@ -35,6 +60,25 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+
+// Half-open socket detection. A backgrounded phone or a dropped mobile connection
+// leaves a socket that never fires 'close', so the player stays 'connected' forever
+// and every "waiting on all connected players" phase waits on a ghost. Ping on an
+// interval; a client that misses one full round terminates, which routes into the
+// normal close path (host promotion + onPlayerLeft) rather than hanging the room.
+const HEARTBEAT_MS = parseInt(process.env.HEARTBEAT_MS) || 30000;
+wss.on('connection', ws => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+});
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) { ws.terminate(); continue; }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_MS);
+wss.on('close', () => clearInterval(heartbeat));
 
 function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
