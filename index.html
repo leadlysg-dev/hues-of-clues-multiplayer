@@ -1412,10 +1412,11 @@ function renderLobby(){
   el('lobbyGameName').textContent=meta.name;
   const inviteUrl=`${location.origin}${location.pathname}?join=${state.code}`;
   const qrImg=el('lobbyQrImg');
-  if(qrImg.dataset.url!==inviteUrl){
-    qrImg.dataset.url=inviteUrl;
-    qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(inviteUrl)}`;
-  }
+  // QR deferred: the join code + copy-invite button below are the front door that
+  // fixes the raw-URL defect. QR image is intentionally not populated — no runtime
+  // third-party call (was api.qrserver.com). Clean hook: set qrImg.src from an
+  // OFFLINE/inline generator here when the QR is built, and it un-hides via onload.
+  qrImg.dataset.url=inviteUrl;
   const pl=el('lobbyPlayers');
   pl.innerHTML='';
   state.players.forEach((p,i)=>{
