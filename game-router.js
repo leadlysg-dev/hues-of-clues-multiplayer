@@ -19,7 +19,13 @@ function getModule(room) {
 
 // Creates the base room object and calls the module's initRoom for game-specific fields.
 function createRoom(code, hostName, settings, gameType) {
-  const type = (gameType || 'spectrum').toLowerCase();
+  // A missing gameType is a caller bug (stale client, direct-join, anything
+  // bypassing the lobby picker). Reject it loudly — never silently mount a
+  // default game on the shared colour board (Kenneth's wrong-game screenshot).
+  if (gameType == null || String(gameType).trim() === '') {
+    throw new Error('gameType is required');
+  }
+  const type = String(gameType).toLowerCase();
   if (!MODULES[type]) throw new Error(`Unknown gameType: ${type}`);
   const room = {
     code,

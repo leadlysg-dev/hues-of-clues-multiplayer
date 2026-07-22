@@ -225,7 +225,9 @@ wss.on('connection', (ws) => {
     if (type === 'CREATE_ROOM') {
       const name = (msg.name || '').trim().slice(0, 16);
       if (!name) return send(ws, { type: 'ERROR', message: 'Name required' });
-      const gameType = (msg.gameType || 'spectrum').toLowerCase();
+      // Pass the client's gameType through untouched — the router is the single
+      // source of truth and rejects a missing/unknown type rather than defaulting.
+      const gameType = msg.gameType;
       const code = genCode();
       let room;
       try { room = game.createRoom(code, name, { turnSeconds: msg.turnSeconds }, gameType); }
