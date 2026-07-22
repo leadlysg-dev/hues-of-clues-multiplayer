@@ -25,7 +25,10 @@
     --radius:0px; --radius-lg:0px; --ink:#000000;
     --canvas:#fff1e8; --canvas-line:rgba(29,43,83,0.35);
   }
-  [data-theme="retro"] *{font-family:'Courier New','Lucida Console',monospace !important; letter-spacing:0.5px;}
+  /* Courier New runs ~15% wider per character than the modern sans; the old 0.5px
+     tracking compounded that and was the actual cause of one-word-per-line wraps
+     in narrow columns (header phase heading, bluff options) — not font-size. */
+  [data-theme="retro"] *{font-family:'Courier New','Lucida Console',monospace !important; letter-spacing:0.15px;}
   [data-theme="retro"] button{
     border:2px solid var(--text) !important; border-radius:0 !important;
     box-shadow:3px 3px 0 var(--text); transition:none; text-transform:uppercase; letter-spacing:1px;
@@ -164,6 +167,27 @@
   .btn-ghost{background:rgba(96,165,250,0.1); color:var(--blue); border:1px solid rgba(96,165,250,0.2);}
   .btn-ghost:hover:not(:disabled){filter:none; background:rgba(96,165,250,0.18);}
   .icon-btn{background:var(--panel2); color:var(--muted); font-size:16px; padding:8px 12px; line-height:1;}
+
+  /* ============ HEADER OVERFLOW MENU ============
+     Collapses Home/Sound/End/Skin — four low-frequency actions — behind one
+     labelled trigger, so the header carries at most 1-2 primary buttons
+     (Undo/Skip when they apply) plus this single overflow instead of six
+     equally-loud icons fighting the phase heading for space. */
+  .h-more-wrap{position:relative;}
+  .h-more-menu{
+    position:absolute; top:calc(100% + 6px); right:0; z-index:50; display:none; flex-direction:column; gap:2px;
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg);
+    padding:6px; min-width:170px;
+  }
+  .h-more-menu.open{display:flex; animation:fadeIn 120ms ease forwards;}
+  .h-more-menu button{
+    width:100%; text-align:left; justify-content:flex-start; padding:10px 12px; font-size:13px;
+    background:transparent; border:1px solid transparent; border-radius:6px; color:var(--text);
+  }
+  .h-more-menu button:hover:not(:disabled){filter:none; background:var(--panel2);}
+  .h-more-menu button.danger{color:var(--pink);}
+  [data-theme="retro"] .h-more-menu{border:2px solid var(--text) !important; border-radius:0 !important; box-shadow:4px 4px 0 var(--text) !important;}
+  [data-theme="retro"] .h-more-menu button{border:none !important; box-shadow:none !important; text-transform:none;}
 
   #clueBar{
     display:none; background:linear-gradient(135deg,rgba(251,191,36,0.1),rgba(251,191,36,0.03));
@@ -329,6 +353,108 @@
   .lobby-dot{width:13px; height:13px; border-radius:50%; flex-shrink:0;}
   .lobby-hint{font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.5;}
 
+  /* ============ LOBBY: GAME IDENTITY + JOIN FRONT DOOR ============ */
+  .lobby-identity{display:flex; flex-direction:column; align-items:center; gap:6px; margin-bottom:28px; text-align:center;}
+  .lobby-identity .li-emoji{font-size:52px; line-height:1; filter:drop-shadow(0 4px 18px rgba(251,191,36,0.25));}
+  .lobby-identity .li-name{font-size:22px; font-weight:800; color:var(--text);}
+  .lobby-identity .li-tag{font-size:12px; color:var(--muted); font-weight:600; letter-spacing:0.5px; text-transform:uppercase;}
+  .lobby-join-row{display:flex; align-items:center; justify-content:center; gap:16px; margin:16px 0 8px; flex-wrap:wrap;}
+  .lobby-qr{
+    width:96px; height:96px; border-radius:10px; background:#fff; padding:6px; flex-shrink:0;
+    box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
+  }
+  .lobby-qr img{width:100%; height:100%; image-rendering:pixelated; display:block;}
+  .lobby-qr.hidden{display:none;}
+  .lobby-copy-btn{
+    background:rgba(74,222,128,0.12); color:var(--green); border:1px solid rgba(74,222,128,0.28);
+    border-radius:8px; font-size:14px; font-weight:700; padding:11px 18px; white-space:nowrap;
+    display:flex; align-items:center; gap:8px; transition:background 150ms ease, border-color 150ms ease;
+  }
+  .lobby-copy-btn:hover:not(:disabled){filter:none; background:rgba(74,222,128,0.2);}
+  .lobby-copy-btn.copied{background:var(--green); color:var(--ink); border-color:var(--green);}
+  [data-theme="retro"] .lobby-qr{border-radius:0; border:2px solid var(--text); box-shadow:3px 3px 0 var(--text);}
+  [data-theme="retro"] .lobby-copy-btn{border-radius:0;}
+  @media(max-width:420px){
+    .lobby-identity .li-emoji{font-size:40px;}
+    .lobby-identity .li-name{font-size:18px;}
+    .lobby-qr{width:76px; height:76px;}
+  }
+
+  /* ============ RESULTS / WIN SCREEN ============ */
+  #results{
+    position:fixed; inset:0; background:var(--bg); z-index:60; display:none;
+    align-items:center; justify-content:center; padding:24px; overflow:auto;
+    background-image:radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.10) 0%, transparent 55%),
+                     radial-gradient(ellipse at 80% 100%, rgba(244,114,182,0.06) 0%, transparent 50%);
+  }
+  #confettiLayer{position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:1;}
+  .confetti-piece{
+    position:absolute; top:-24px; width:9px; height:15px; border-radius:2px; opacity:0.95;
+    animation:confettiFall linear forwards;
+  }
+  .confetti-piece.pixel{border-radius:0; width:9px; height:9px; animation-timing-function:steps(6);}
+  @keyframes confettiFall{
+    0%{transform:translateY(-24px) translateX(0) rotate(0deg); opacity:1;}
+    85%{opacity:1;}
+    100%{transform:translateY(105vh) translateX(var(--drift)) rotate(540deg); opacity:0;}
+  }
+  .results-card{
+    position:relative; z-index:2;
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-lg); padding:36px 32px; width:480px; max-width:100%;
+  }
+  .results-kicker{font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); text-align:center;}
+  .results-winner{text-align:center; margin:10px 0 26px;}
+  .results-crown{font-size:44px; line-height:1; animation:resultsCrownPop 500ms cubic-bezier(0.34,1.56,0.64,1) both;}
+  .results-winner-name{
+    font-size:30px; font-weight:800; margin-top:6px; line-height:1.25;
+    animation:resultsNamePop 550ms cubic-bezier(0.34,1.56,0.64,1) 80ms both;
+  }
+  .results-winner-sub{font-size:13px; color:var(--muted); margin-top:6px; font-weight:500;}
+  @keyframes resultsCrownPop{0%{transform:scale(0) rotate(-25deg);opacity:0} 70%{transform:scale(1.25) rotate(8deg)} 100%{transform:scale(1) rotate(0);opacity:1}}
+  @keyframes resultsNamePop{from{transform:translateY(10px) scale(0.9);opacity:0} to{transform:translateY(0) scale(1);opacity:1}}
+
+  .podium{display:flex; flex-direction:column; gap:8px; margin-bottom:24px;}
+  .podium-row{
+    display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.18);
+    border:1px solid var(--border); border-radius:8px; padding:9px 12px;
+    opacity:0; animation:podiumRise 380ms cubic-bezier(0.22,1,0.36,1) forwards;
+    animation-delay:var(--delay,0ms);
+  }
+  .podium-row.first{
+    background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.4);
+    box-shadow:0 0 0 1px rgba(251,191,36,0.15), 0 0 24px rgba(251,191,36,0.12);
+  }
+  @keyframes podiumRise{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)}}
+  .podium-rank{font-size:18px; width:30px; text-align:center; flex-shrink:0; font-weight:800; font-variant-numeric:tabular-nums;}
+  .podium-dot{width:12px; height:12px; border-radius:50%; flex-shrink:0;}
+  .podium-name{font-size:14px; font-weight:600; flex-shrink:0; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .podium-bar-wrap{flex:1; height:8px; background:rgba(255,255,255,0.06); border-radius:999px; overflow:hidden; min-width:30px;}
+  .podium-bar{height:100%; border-radius:999px; transition:width 500ms cubic-bezier(0.22,1,0.36,1);}
+  .podium-score{font-size:15px; font-weight:800; min-width:28px; text-align:right; font-variant-numeric:tabular-nums; color:var(--accent);}
+  .results-actions{display:flex; gap:10px;}
+  .results-actions button{flex:1; font-size:15px; padding:14px;}
+  @media(max-width:480px){
+    .results-card{padding:26px 20px;}
+    .results-crown{font-size:36px;}
+    .results-winner-name{font-size:24px;}
+    .podium-name{max-width:72px;}
+  }
+  [data-theme="retro"] .results-card{
+    border:2px solid var(--text) !important; box-shadow:6px 6px 0 var(--text) !important; border-radius:0 !important;
+  }
+  [data-theme="retro"] .results-winner-name{text-shadow:3px 3px 0 rgba(0,0,0,0.6);}
+  [data-theme="retro"] .results-crown{animation:pixelBounce 0.5s steps(2) infinite;}
+  [data-theme="retro"] .podium-row{border-radius:0 !important; border:2px solid var(--border) !important;}
+  [data-theme="retro"] .podium-row.first{border:2px solid var(--accent) !important; box-shadow:3px 3px 0 var(--accent) !important;}
+  [data-theme="retro"] .podium-bar-wrap{border-radius:0;}
+  [data-theme="retro"] .podium-bar{border-radius:0;}
+  @media (prefers-reduced-motion: reduce){
+    .confetti-piece{display:none;}
+    .results-crown,.results-winner-name,.podium-row{animation:none; opacity:1;}
+    [data-theme="retro"] .results-crown{animation:none;}
+  }
+
   /* ============ MOBILE GUESS BAR ============ */
   #mobileBar{
     display:none; position:fixed; bottom:0; left:0; right:0; z-index:30;
@@ -367,7 +493,13 @@
     .chip{flex-shrink:0; padding:5px 10px; font-size:13px; gap:6px;}
     .chip .dot{width:11px; height:11px;}
     .chip .pts{font-size:14px;}
-    .main{gap:0;}
+    /* V-14: row layout put a fixed 260px #pictArea beside .board-area, which on a
+       390px phone left the board ~130px wide — ~5 of 30 columns visible. Stacking
+       lets the board claim full width; #pictArea flows below at its content height
+       instead of starving the board for a sidebar that no longer needs to be one.
+       (The width override lives with #pictArea's base rule further down — same
+       specificity, and this rule comes first in source order so it would lose.) */
+    .main{gap:6px; flex-direction:column;}
     .panel{display:none;}
     .board-area{overflow:auto; -webkit-overflow-scrolling:touch; align-items:flex-start; justify-content:flex-start;}
     #board{min-width:560px; min-height:280px; border-radius:0;}
@@ -541,11 +673,19 @@
 
   /* ============ BLUFF THE BOARD ============ */
   #bluffArea{display:none; flex-direction:column; gap:16px; width:100%; max-width:820px; padding:20px; overflow-y:auto;}
-  .bluff-cell-swatch{height:140px; border-radius:var(--radius-lg);
-                     box-shadow:var(--shadow-lg), 0 0 48px rgba(251,191,36,0.25);
+  /* The swatch IS the color under discussion, rendered at full saturation — it can
+     legitimately land on a flat orange. A caption + inset ring is what tells a
+     player "this is a designed surface" instead of "this image failed to load". */
+  .bluff-cell-swatch{height:140px; border-radius:var(--radius-lg); position:relative;
+                     box-shadow:var(--shadow-lg), 0 0 48px rgba(251,191,36,0.25), inset 0 0 0 1px rgba(255,255,255,0.18);
                      display:flex; align-items:center; justify-content:center;
-                     font-size:36px; font-weight:700; color:rgba(0,0,0,.4);
+                     font-size:40px; font-weight:700; color:rgba(0,0,0,.4);
                      animation:revealPop 320ms cubic-bezier(0.34,1.56,0.64,1);}
+  .bluff-cell-swatch::after{
+    content:'This round\'s color'; position:absolute; left:0; right:0; bottom:10px; text-align:center;
+    font-size:11px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase;
+    color:rgba(0,0,0,.45); text-shadow:0 1px 1px rgba(255,255,255,.25);
+  }
   .bluff-prompt{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
                 box-shadow:var(--shadow); padding:16px 20px; font-size:15px; color:var(--muted); line-height:1.7;}
   .bluff-prompt b{color:var(--accent);}
@@ -563,7 +703,8 @@
              text-align:left; cursor:pointer; line-height:1.5; display:flex; gap:12px; align-items:flex-start;
              transition:border-color 150ms ease, transform 150ms ease;}
   .bluff-opt:hover:not(.selected):not(.disabled){border-color:var(--accent); transform:translateY(-1px);}
-  .bluff-opt.selected{border-color:var(--blue); background:rgba(96,165,250,.12);}
+  .bluff-opt.selected{border-color:var(--blue); background:rgba(96,165,250,.12); animation:optSelectPop 240ms cubic-bezier(0.34,1.56,0.64,1);}
+  @keyframes optSelectPop{0%{transform:scale(1)} 40%{transform:scale(1.025)} 100%{transform:scale(1)}}
   .bluff-opt.disabled{cursor:default; opacity:.55; transform:none;}
   .bluff-opt.real{border-color:var(--green); background:rgba(74,222,128,.1);}
   .bluff-opt.my-bluff{border-color:var(--pink);}
@@ -576,11 +717,17 @@
   .bluff-author{font-size:13px; color:var(--muted); margin-top:4px;}
   .bluff-wait{font-size:14px; color:var(--muted); text-align:center;}
   .bluff-submitted-badge{background:var(--green); color:var(--ink); padding:5px 12px; border-radius:999px;
-                         font-size:13px; font-weight:700; display:inline-block;}
+                         font-size:13px; font-weight:700; display:inline-block;
+                         animation:revealPop 320ms cubic-bezier(0.34,1.56,0.64,1);}
   [data-theme="retro"] .bluff-cell-swatch{border:4px solid var(--text); border-radius:0; box-shadow:6px 6px 0 var(--text); animation:none;}
   [data-theme="retro"] .bluff-prompt,[data-theme="retro"] .bluff-opt{
     border:2px solid var(--text) !important; border-radius:0 !important; box-shadow:3px 3px 0 var(--text) !important;
   }
+  /* .bluff-opt is a <button>, so it inherits the retro button rule's uppercase —
+     right for a 2-word label, wrong for an 80-char fake fact. Long-form reading
+     text stays mixed-case; the letter/badge beside it keeps the retro shout. */
+  [data-theme="retro"] .bluff-opt{text-transform:none; letter-spacing:0.15px;}
+  [data-theme="retro"] .bluff-opt .bluff-letter{text-transform:uppercase;}
   [data-theme="retro"] .bluff-opt:hover:not(.selected):not(.disabled){transform:none; box-shadow:3px 3px 0 var(--accent) !important;}
   [data-theme="retro"] .bluff-input{border:2px solid var(--accent); border-radius:0; color:var(--accent);}
   [data-theme="retro"] .bluff-letter,[data-theme="retro"] .bluff-vote-dot,
@@ -589,6 +736,11 @@
   /* ============ PIXEL PICTIONARY ============ */
   #pictArea{display:none; flex-direction:column; gap:10px; width:260px; flex-shrink:0;
             padding:12px; overflow-y:auto;}
+  @media(max-width:768px){
+    /* Paired with .main{flex-direction:column} in the main mobile block above — drop
+       the fixed 260px sidebar width so pictArea flows full-width below the board. */
+    #pictArea{width:100%; flex-shrink:0; max-height:46vh;}
+  }
   .pict-word{background:var(--accent); color:var(--ink); border-radius:var(--radius);
              box-shadow:var(--shadow); padding:12px 16px; font-size:20px; font-weight:700; text-align:center;}
   .pict-palette{display:flex; flex-wrap:wrap; gap:6px; padding:4px 0;}
@@ -891,13 +1043,38 @@
 <!-- ============ LOBBY ============ -->
 <div id="lobby">
   <div class="lobby-card">
-    <h2>Share this code to invite players</h2>
+    <div class="lobby-identity" id="lobbyIdentity">
+      <div class="li-emoji" id="lobbyEmoji">🎨</div>
+      <div class="li-name" id="lobbyGameName">Hues of Clues</div>
+      <div class="li-tag">Join code below — the front door to the party</div>
+    </div>
     <div class="code-display" id="lobbyCode">????</div>
-    <div class="lobby-hint">Share this link with everyone: <b id="lobbyUrl"></b></div>
+    <div class="lobby-join-row">
+      <div class="lobby-qr hidden" id="lobbyQr"><img id="lobbyQrImg" alt="Scan to join" onerror="this.closest('.lobby-qr').classList.add('hidden')" onload="this.closest('.lobby-qr').classList.remove('hidden')"></div>
+      <button class="lobby-copy-btn" id="lobbyCopyBtn" onclick="copyInviteLink()">📋 Copy invite link</button>
+    </div>
     <div class="lobby-players" id="lobbyPlayers"></div>
     <button class="btn-green" id="lobbyStartBtn" onclick="doStart()" style="display:none">▶ Everyone's In — Start Game</button>
     <button class="btn-blue" onclick="doLeaveLobby()" style="margin-top:8px;width:100%;font-size:15px;padding:12px;">← Leave Room</button>
     <div class="err-msg" id="lobbyErr"></div>
+  </div>
+</div>
+
+<!-- ============ RESULTS / WIN SCREEN ============ -->
+<div id="results">
+  <div id="confettiLayer"></div>
+  <div class="results-card">
+    <div class="results-kicker">🏆 Game Over</div>
+    <div class="results-winner">
+      <div class="results-crown">🏆</div>
+      <div class="results-winner-name" id="resultsWinnerName"></div>
+      <div class="results-winner-sub" id="resultsWinnerSub"></div>
+    </div>
+    <div class="podium" id="resultsPodium"></div>
+    <div class="results-actions">
+      <button class="btn-green" onclick="doPlayAgain()">🔄 Play Again</button>
+      <button class="btn-blue" onclick="doLeaveGame()">🏠 Home</button>
+    </div>
   </div>
 </div>
 
@@ -954,6 +1131,13 @@
 
 <script>
 const COLS=30, ROWS=16;
+const GAME_META={
+  hues:{emoji:'🎨',name:'Hues of Clues'},
+  spectrum:{emoji:'🌈',name:'Spectrum'},
+  trivia:{emoji:'🧠',name:'Rapid Fire Trivia'},
+  bluff:{emoji:'🃏',name:'Bluff the Board'},
+  pictionary:{emoji:'✏️',name:'Pixel Pictionary'},
+};
 // Phases each mode actually emits, taken from the game modules rather than from
 // the brief — the old client's set was missing bluff's 'writing' and pictionary's
 // 'timeout'/'vote', which put a spinner over three phases of working gameplay.
@@ -1086,6 +1270,7 @@ function render(){
   el('peek').style.display='none';
   el('app').style.display='none';
   el('waiting').style.display='none';
+  el('results').style.display='none';
   updateMobileBar();
   const rh=el('rotateHint');
   if(rh){if(!rotateDismissed&&phase!=='lobby')rh.classList.add('game-active');
@@ -1094,6 +1279,15 @@ function render(){
   if(phase==='lobby'){
     renderLobby();
     el('lobby').style.display='flex';
+    return;
+  }
+
+  // The results screen is its own dedicated moment (podium, confetti, winner
+  // emphasis) rather than a tiny header label bolted onto whichever board was
+  // last on screen — every game mode's 'over' phase routes here identically.
+  if(phase==='over'){
+    renderResults();
+    el('results').style.display='flex';
     return;
   }
 
@@ -1131,24 +1325,18 @@ function render(){
     el('panel').style.display='none';
     el('mobileBar').classList.remove('active');
     el('app').classList.remove('bar-open');
-    if(phase==='over'){
-      el('triviaArea').style.display='none';
-      renderTriviaHeader();
-      renderScores();
-    } else {
-      el('triviaArea').style.display='flex';
-      renderTriviaHeader();
-      renderScores();
-      renderTriviaArea();
-      renderTimer();
-    }
+    el('triviaArea').style.display='flex';
+    renderTriviaHeader();
+    renderScores();
+    renderTriviaArea();
+    renderTimer();
     return;
   }
 
   if(state.gameType==='bluff'){
     el('board').style.display='none';
     el('triviaArea').style.display='none';
-    el('bluffArea').style.display=phase==='over'?'none':'flex';
+    el('bluffArea').style.display='flex';
     el('pictArea').style.display='none';
     el('clueBar').style.display='none';
     el('spectrumBar').classList.remove('visible');
@@ -1157,7 +1345,7 @@ function render(){
     el('app').classList.remove('bar-open');
     renderBluffHeader();
     renderScores();
-    if(phase!=='over') renderBluffArea();
+    renderBluffArea();
     return;
   }
 
@@ -1169,12 +1357,12 @@ function render(){
     el('spectrumBar').classList.remove('visible');
     el('mobileBar').classList.remove('active');
     el('app').classList.remove('bar-open');
-    el('pictArea').style.display=phase==='over'?'none':'flex';
+    el('pictArea').style.display='flex';
     el('panel').style.display='none';
     renderPictHeader();
     renderScores();
     renderPictBoard();
-    if(phase!=='over') renderPictArea();
+    renderPictArea();
     renderTimer();
     return;
   }
@@ -1188,7 +1376,7 @@ function render(){
   el('panel').style.display='';
   const isSpectrum=state.gameType==='spectrum';
   el('board').classList.toggle('spectrum-board',isSpectrum);
-  if(isSpectrum&&phase!=='over'){
+  if(isSpectrum){
     el('spLeft').textContent=state.spectrumLeft||'';
     el('spRight').textContent=state.spectrumRight||'';
     el('spectrumBar').classList.add('visible');
@@ -1219,7 +1407,15 @@ function render(){
 /* ====== LOBBY ====== */
 function renderLobby(){
   el('lobbyCode').textContent=state.code;
-  el('lobbyUrl').textContent=`${location.origin}${location.pathname}?join=${state.code}`;
+  const meta=GAME_META[state.gameType]||GAME_META.hues;
+  el('lobbyEmoji').textContent=meta.emoji;
+  el('lobbyGameName').textContent=meta.name;
+  const inviteUrl=`${location.origin}${location.pathname}?join=${state.code}`;
+  const qrImg=el('lobbyQrImg');
+  if(qrImg.dataset.url!==inviteUrl){
+    qrImg.dataset.url=inviteUrl;
+    qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(inviteUrl)}`;
+  }
   const pl=el('lobbyPlayers');
   pl.innerHTML='';
   state.players.forEach((p,i)=>{
@@ -1245,6 +1441,85 @@ function renderLobby(){
 function doStart(){
   wsSend({type:'START_GAME'});
 }
+function copyInviteLink(){
+  const url=el('lobbyQrImg').dataset.url||`${location.origin}${location.pathname}?join=${state.code}`;
+  const btn=el('lobbyCopyBtn');
+  const flash=ok=>{
+    btn.classList.toggle('copied',ok);
+    btn.textContent=ok?'✓ Copied!':'📋 Copy invite link';
+    setTimeout(()=>{btn.classList.remove('copied'); btn.textContent='📋 Copy invite link';},1600);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>flash(true)).catch(()=>flash(false));
+  } else {
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=url; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      flash(true);
+    }catch(e){ flash(false); }
+  }
+}
+/* ====== RESULTS / WIN SCREEN ======
+   One shared results screen for every game mode's 'over' phase, instead of each
+   mode re-deriving its own tiny "X wins!" header label. Rank is competition-style
+   (ties share a rank; the next distinct score resumes at its true position) so a
+   2-2-1 scoreline reads as 1st/1st/3rd, not 1st/2nd/3rd. */
+function renderResults(){
+  if(!state) return;
+  const meta=GAME_META[state.gameType]||GAME_META.hues;
+  const ranked=[...state.players].sort((a,b)=>b.score-a.score);
+  const best=ranked.length?ranked[0].score:0;
+  const winners=ranked.filter(p=>p.score===best);
+  const maxScore=Math.max(1,best);
+
+  el('resultsWinnerName').innerHTML=winners.map(p=>`<span style="color:${p.color}">${esc(p.name)}</span>`).join(' & ')
+    +(winners.length>1?' tie!':' wins!');
+  el('resultsWinnerSub').textContent=`${meta.emoji} ${meta.name} — final scores`;
+
+  const podium=el('resultsPodium'); podium.innerHTML='';
+  let rank=1;
+  ranked.forEach((p,i)=>{
+    if(i>0&&p.score<ranked[i-1].score) rank=i+1;
+    const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
+    const row=document.createElement('div');
+    row.className='podium-row'+(rank===1?' first':'');
+    row.style.setProperty('--delay',(i*90)+'ms');
+    row.innerHTML=`
+      <div class="podium-rank">${medal}</div>
+      <div class="podium-dot" style="background:${p.color}"></div>
+      <div class="podium-name">${esc(p.name)}</div>
+      <div class="podium-bar-wrap"><div class="podium-bar" style="width:${Math.max(6,p.score/maxScore*100)}%;background:${p.color}"></div></div>
+      <div class="podium-score">${p.score}</div>`;
+    podium.appendChild(row);
+  });
+
+  spawnConfetti();
+}
+
+function spawnConfetti(){
+  const layer=el('confettiLayer'); if(!layer) return;
+  layer.innerHTML='';
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors=[getCss('--accent'),getCss('--pink'),getCss('--blue'),getCss('--green')];
+  const isRetro=currentSkin==='retro';
+  const n=isRetro?26:46;
+  for(let i=0;i<n;i++){
+    const piece=document.createElement('div');
+    piece.className='confetti-piece'+(isRetro?' pixel':'');
+    piece.style.left=(Math.random()*100)+'%';
+    piece.style.background=colors[i%colors.length];
+    piece.style.animationDelay=(Math.random()*0.7)+'s';
+    piece.style.animationDuration=(2.4+Math.random()*1.8)+'s';
+    piece.style.setProperty('--drift',Math.round(Math.random()*70-35)+'px');
+    layer.appendChild(piece);
+  }
+}
+function getCss(varName){
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim()||'#fbbf24';
+}
+
 function doLeaveLobby(){
   if(ws){ ws.onclose=null; ws.close(); ws=null; }
   myIdx=null; myCode=null; myName=null; state=null;
@@ -1330,25 +1605,36 @@ function renderGameHeader(){
       subEl.innerHTML=t&&t.r!==undefined?`${myPts}Secret was <b>${coord(t.r,t.c)}</b> — ★ dead-on 3pts · solid box 2pts · dashed 1pt`:'';
     }
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next round →','btn-accent',doNextRound);
-  } else if(phase==='over'){
-    const best=Math.max(...state.players.map(p=>p.score));
-    const winners=state.players.filter(p=>p.score===best).map(p=>p.name).join(' & ');
-    phaseEl.textContent=`🏆 ${winners} win${winners.includes('&')?'':'s'}!`;
-    subEl.textContent='Thanks for playing — final scores above.';
-    addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
-    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
+  // phase==='over' never reaches here — render() routes it to the dedicated
+  // results screen before renderGameHeader() is called.
 
-  if(phase!=='over') addBtn(right,'🏠','icon-btn',doLeaveGame);
-  addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
-  if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
-  addBtn(right,currentSkin==='retro'?'⚡':'✨','icon-btn',cycleSkin);
+  addMoreMenu(right);
 }
 
 function addBtn(p,label,cls,fn,dis){
   const b=document.createElement('button'); b.className=cls; b.innerHTML=label; b.onclick=fn;
   if(dis)b.disabled=true; p.appendChild(b);
 }
+
+/* Shared header overflow — see .h-more-menu comment for why this exists. */
+function addMoreMenu(right){
+  const wrap=document.createElement('div'); wrap.className='h-more-wrap';
+  const trigger=document.createElement('button');
+  trigger.className='icon-btn'; trigger.textContent='⋯'; trigger.title='More';
+  const menu=document.createElement('div'); menu.className='h-more-menu';
+  trigger.onclick=e=>{ e.stopPropagation(); const willOpen=!menu.classList.contains('open');
+    document.querySelectorAll('.h-more-menu.open').forEach(m=>m.classList.remove('open'));
+    if(willOpen) menu.classList.add('open'); };
+  const close=()=>menu.classList.remove('open');
+  addBtn(menu,musicOn?'🔊 Sound: on':'🔇 Sound: off','',()=>{toggleMusic();close();});
+  addBtn(menu,currentSkin==='retro'?'⚡ Retro skin':'✨ Modern skin','',()=>{cycleSkin();close();});
+  addBtn(menu,'⏹ End game for everyone','danger',()=>{close();doEnd();});
+  addBtn(menu,'🏠 Leave to home','',()=>{close();doLeaveGame();});
+  wrap.appendChild(trigger); wrap.appendChild(menu);
+  right.appendChild(wrap);
+}
+document.addEventListener('click',()=>{document.querySelectorAll('.h-more-menu.open').forEach(m=>m.classList.remove('open'));});
 
 /* ====== SCORES ====== */
 function renderScores(){
@@ -1732,17 +2018,10 @@ function renderTriviaHeader(){
       ?`<b style="color:var(--green)">You got it! +1</b>`
       :`<b style="color:var(--muted)">No points this round.</b>`;
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next →','btn-accent',doNextRound);
-  } else if(phase==='over'){
-    const best=Math.max(...state.players.map(p=>p.score));
-    const winners=state.players.filter(p=>p.score===best).map(p=>p.name).join(' & ');
-    phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
-    subEl.textContent='Final scores above.';
-    addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
-    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
+  // phase==='over' never reaches here — render() routes it to the dedicated results screen.
 
-  addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
-  if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
+  addMoreMenu(right);
 }
 
 function renderTriviaArea(){
@@ -1844,16 +2123,9 @@ function renderBluffHeader(){
     subEl.innerHTML=myDelta>0?`<b style="color:var(--green)">+${myDelta} this round!</b>`:
       `<b style="color:var(--muted)">No points this round.</b>`;
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next round →','btn-accent',doNextRound);
-  } else if(phase==='over'){
-    const best=Math.max(...state.players.map(p=>p.score));
-    const winners=state.players.filter(p=>p.score===best).map(p=>p.name).join(' & ');
-    phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
-    subEl.textContent='Final scores above.';
-    addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
-    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
-  addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
-  if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
+  // phase==='over' never reaches here — render() routes it to the dedicated results screen.
+  addMoreMenu(right);
 }
 
 function renderBluffArea(){
@@ -1974,16 +2246,9 @@ function renderPictHeader(){
     subEl.innerHTML=myDelta>0?`<b style="color:var(--green)">+${myDelta} this round!</b>`:
       `<b style="color:var(--muted)">No points this round.</b>`;
     addBtn(right,state.round+1>=state.totalRounds?'🏁 Final results':'Next →','btn-accent',doNextRound);
-  } else if(phase==='over'){
-    const best=Math.max(...state.players.map(p=>p.score));
-    const winners=state.players.filter(p=>p.score===best).map(p=>p.name).join(' & ');
-    phaseEl.textContent=`🏆 ${winners} win${state.players.filter(p=>p.score===best).length>1?'':'s'}!`;
-    subEl.textContent='Final scores above.';
-    addBtn(right,'🔄 Play again','btn-accent',doPlayAgain);
-    addBtn(right,'🏠 Home','btn-ghost',doLeaveGame);
   }
-  addBtn(right,musicOn?'🔊':'🔇','icon-btn',toggleMusic);
-  if(phase!=='over') addBtn(right,'⏹ End','icon-btn',doEnd);
+  // phase==='over' never reaches here — render() routes it to the dedicated results screen.
+  addMoreMenu(right);
 }
 
 function renderPictBoard(){
@@ -2028,7 +2293,11 @@ function renderPictBoard(){
 }
 
 function renderPictArea(){
-  const pa=el('panel');
+  // #panel is the shared sidebar for spectrum/hues and is force-hidden for pictionary
+  // (render()'s pictionary branch sets el('panel').style.display='none'); #pictArea is
+  // pictionary's own container. Writing into #panel here meant the artist's palette and
+  // the guesser's guess box/chat never rendered anywhere, on any viewport or skin.
+  const pa=el('pictArea');
   const phase=state.phase;
   const isArtist=myIdx===state.artistIdx;
   const colors=state.paintColors||['#fff1e8','#ffec27','#ff004d','#ff77a8','#00e436','#29adff','#1d2b53','#000000'];
