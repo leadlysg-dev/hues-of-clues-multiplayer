@@ -53,12 +53,7 @@ const SHARED_PHASES = ['lobby', 'score', 'over'];
 // Mirrors PAINT_COLORS in game-pictionary.js — the server validates the exact string.
 const PAINT_COLORS = ['#fff1e8','#ffec27','#ff004d','#ff77a8','#00e436','#29adff','#1d2b53','#000000'];
 
-// Prefer the plain headless-shell binary — full Chrome.app registers a Dock icon
-// for every headless instance; the shell binary is not an app bundle and never does.
-const HEADLESS_SHELL = '/Users/kt/.openclaw/headless-shell/current';
-const CHROME = require('fs').existsSync(HEADLESS_SHELL)
-  ? HEADLESS_SHELL
-  : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
