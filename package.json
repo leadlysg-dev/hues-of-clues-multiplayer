@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test-disconnect.js && node test-platform.js && node test-client-deadline.js",
+    "test": "node test-disconnect.js && node test-platform.js && node test-client-deadline.js && node test-phase-coverage.js",
     "capture": "node capture.js"
   },
   "dependencies": {
