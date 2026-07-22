@@ -14,6 +14,7 @@
     --accent:#fbbf24; --pink:#f472b6; --blue:#60a5fa; --green:#4ade80;
     --border:rgba(148,163,184,0.1); --shadow:0 4px 24px rgba(0,0,0,0.5);
     --shadow-lg:0 12px 48px rgba(0,0,0,0.7); --radius:10px; --radius-lg:16px; --ink:#0f172a;
+    --canvas:#ffffff; --canvas-line:rgba(15,23,42,0.10);
   }
 
   /* ===== RETRO (PICO-8) SKIN ===== */
@@ -22,6 +23,7 @@
     --accent:#ffec27; --pink:#ff77a8; --blue:#29adff; --green:#00e436;
     --border:#7e2553; --shadow:4px 4px 0 #000; --shadow-lg:6px 6px 0 #000;
     --radius:0px; --radius-lg:0px; --ink:#000000;
+    --canvas:#fff1e8; --canvas-line:rgba(29,43,83,0.35);
   }
   [data-theme="retro"] *{font-family:'Courier New','Lucida Console',monospace !important; letter-spacing:0.5px;}
   [data-theme="retro"] button{
@@ -1995,10 +1997,12 @@ function renderPictBoard(){
     x.classList.remove('target','ring1','ring2','guessable');
     x.style.background='';
   });
-  // Restore base colours from cellHsl, then paint over with painted cells
+  // Pictionary is a blank drawing canvas, NOT the Hues colour grid. Fill every
+  // cell with the paper token (white / retro off-white), then overlay strokes.
+  const canvas=getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim()||'#ffffff';
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
     const cell=el(`cell-${r}-${c}`);
-    if(cell) cell.style.background=cellHsl(r,c).css;
+    if(cell) cell.style.background=canvas;
   }
   for(const pc of (state.paintedCells||[])){
     const cell=el(`cell-${pc.r}-${pc.c}`);
